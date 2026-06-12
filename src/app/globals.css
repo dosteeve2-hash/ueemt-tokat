@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@theme {
+  --color-green: #14A44D;
+  --color-yellow: #F0D100;
+  --color-red: #CE1126;
+  --color-dark: #1a1a1a;
+  --color-bg: #ffffff;
+  --color-bg2: #f8f9fa;
+  --color-border: #e5e7eb;
+  --font-sans: 'Inter', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  color: #1a1a1a;
+  background: #ffffff;
+}
+
+::selection {
+  background: #14A44D;
+  color: white;
+}
