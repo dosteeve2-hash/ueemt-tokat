@@ -4,10 +4,15 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!url || !key || url === 'https://placeholder.supabase.co' || key === 'placeholder') {
+    return supabaseResponse
+  }
+
+  try {
+    const supabase = createServerClient(url, key, {
       cookies: {
         getAll() { return request.cookies.getAll() },
         setAll(cookiesToSet) {
@@ -18,10 +23,12 @@ export async function proxy(request: NextRequest) {
           )
         },
       },
-    }
-  )
+    })
+    await supabase.auth.getUser()
+  } catch {
+    // Supabase unavailable — let the request through unauthenticated
+  }
 
-  await supabase.auth.getUser()
   return supabaseResponse
 }
 
