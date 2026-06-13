@@ -2,9 +2,9 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { Menu, X, LayoutDashboard, LogOut } from 'lucide-react'
+import { Menu, X, LayoutDashboard, LogOut, Rss, User } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import type { User } from '@supabase/supabase-js'
+import type { User as SupabaseUser } from '@supabase/supabase-js'
 
 interface Profile {
   role: string
@@ -14,14 +14,13 @@ interface Profile {
 
 export default function Navbar() {
   const [open, setOpen] = useState(false)
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<SupabaseUser | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [logoUrl, setLogoUrl] = useState('/logo.jpeg')
 
   useEffect(() => {
     const supabase = createClient()
 
-    // Fetch site logo (non-blocking, falls back to /logo.jpeg)
     const fetchLogo = async () => {
       try {
         const { data } = await supabase.from('site_settings').select('value').eq('key', 'logo_url').single()
@@ -94,14 +93,32 @@ export default function Navbar() {
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-6">
             {links.map((l) => (
-              <Link key={l.href} href={l.href} className="text-gray-700 hover:text-green-600 font-medium transition-colors text-sm">
+              <Link
+                key={l.href}
+                href={l.href}
+                className="text-gray-700 hover:text-green-600 font-medium transition-colors text-sm"
+              >
                 {l.label}
               </Link>
             ))}
 
+            {user && (
+              <Link
+                href="/feed"
+                className="flex items-center gap-1.5 text-gray-700 hover:text-green-600 font-medium transition-colors text-sm"
+              >
+                <Rss size={14} />
+                Fil d&apos;actu
+              </Link>
+            )}
+
             {user ? (
-              <div className="flex items-center gap-3">
-                <Link href={dashboardHref} className="flex items-center gap-2 text-gray-700 hover:text-green-600 text-sm font-medium">
+              <div className="flex items-center gap-2 pl-2 border-l border-gray-200">
+                <Link
+                  href="/profil"
+                  className="flex items-center gap-2 text-gray-700 hover:text-green-600 text-sm font-medium"
+                  title="Mon profil"
+                >
                   {profile?.avatar_url ? (
                     <img src={profile.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
                   ) : (
@@ -109,16 +126,32 @@ export default function Navbar() {
                       {displayName.slice(0, 2).toUpperCase()}
                     </div>
                   )}
-                  <span className="max-w-28 truncate">{displayName}</span>
+                  <span className="max-w-24 truncate">{displayName}</span>
                 </Link>
-                <button onClick={handleSignOut} className="text-gray-400 hover:text-red-500 transition-colors p-1" title="Déconnexion">
+                <Link
+                  href={dashboardHref}
+                  className="text-gray-400 hover:text-green-600 transition-colors p-1"
+                  title="Mon espace"
+                >
+                  <LayoutDashboard size={16} />
+                </Link>
+                <button
+                  onClick={handleSignOut}
+                  className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                  title="Déconnexion"
+                >
                   <LogOut size={16} />
                 </button>
               </div>
             ) : (
               <>
-                <Link href="/connexion" className="text-gray-500 hover:text-gray-800 text-sm">Connexion</Link>
-                <Link href="/recensement" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
+                <Link href="/connexion" className="text-gray-500 hover:text-gray-800 text-sm">
+                  Connexion
+                </Link>
+                <Link
+                  href="/recensement"
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                >
                   Se Recenser
                 </Link>
               </>
@@ -151,6 +184,20 @@ export default function Navbar() {
             <div className="border-t border-gray-100 mt-2 pt-2">
               {user ? (
                 <>
+                  <Link
+                    href="/feed"
+                    className="flex items-center gap-2 text-gray-700 hover:text-green-600 hover:bg-gray-50 font-medium py-3 px-2 rounded-lg"
+                    onClick={() => setOpen(false)}
+                  >
+                    <Rss size={16} /> Fil d&apos;actualité
+                  </Link>
+                  <Link
+                    href="/profil"
+                    className="flex items-center gap-2 text-gray-700 hover:text-green-600 hover:bg-gray-50 font-medium py-3 px-2 rounded-lg"
+                    onClick={() => setOpen(false)}
+                  >
+                    <User size={16} /> Mon Profil
+                  </Link>
                   <Link
                     href={dashboardHref}
                     className="flex items-center gap-2 text-gray-700 hover:text-green-600 hover:bg-gray-50 font-medium py-3 px-2 rounded-lg"
