@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { User, FileText, Image, Calendar } from 'lucide-react'
 import ProfileTab from './ProfileTab'
 import DocumentsTab from './DocumentsTab'
+import PhotosTab from './PhotosTab'
 
 interface Props {
   user: { id: string; email: string }
@@ -38,7 +39,7 @@ interface Props {
 const TABS = [
   { id: 'profil', label: 'Mon Profil', icon: User },
   { id: 'documents', label: 'Mes Documents', icon: FileText },
-  { id: 'photos', label: 'Mes Photos', icon: Image },
+  { id: 'photos', label: 'Photos', icon: Image },
   { id: 'activites', label: 'Activités', icon: Calendar },
 ]
 
@@ -77,9 +78,7 @@ export default function DashboardClient({ user, profile, documents, albums }: Pr
               key={id}
               onClick={() => setActiveTab(id)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${
-                activeTab === id
-                  ? 'bg-green-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-50'
+                activeTab === id ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
               <Icon size={16} />
@@ -88,18 +87,9 @@ export default function DashboardClient({ user, profile, documents, albums }: Pr
           ))}
         </div>
 
-        {activeTab === 'profil' && (
-          <ProfileTab user={user} profile={profile} />
-        )}
-        {activeTab === 'documents' && (
-          <DocumentsTab userId={user.id} documents={documents} />
-        )}
-        {activeTab === 'photos' && (
-          <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center text-gray-500">
-            <Image size={40} className="mx-auto mb-3 text-gray-300" />
-            <p>Vos photos apparaîtront ici après upload dans un album.</p>
-          </div>
-        )}
+        {activeTab === 'profil' && <ProfileTab user={user} profile={profile} />}
+        {activeTab === 'documents' && <DocumentsTab userId={user.id} documents={documents} />}
+        {activeTab === 'photos' && <PhotosTab userId={user.id} albums={albums} />}
         {activeTab === 'activites' && (
           <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center text-gray-500">
             <Calendar size={40} className="mx-auto mb-3 text-gray-300" />

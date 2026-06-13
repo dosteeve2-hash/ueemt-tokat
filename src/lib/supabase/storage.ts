@@ -33,9 +33,20 @@ export async function deleteDocument(path: string): Promise<boolean> {
 
 export async function uploadPhoto(albumId: string, file: File): Promise<string | null> {
   const supabase = createClient()
-  const path = `${albumId}/${Date.now()}_${file.name}`
-  const { error } = await supabase.storage.from('photos').upload(path, file)
+  const ext = file.name.split('.').pop() ?? 'jpg'
+  const path = `${albumId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+  const { error } = await supabase.storage.from('photos').upload(path, file, { contentType: file.type })
   if (error) return null
   const { data } = supabase.storage.from('photos').getPublicUrl(path)
   return data.publicUrl
+}
+
+export async function deletePhotoFromStorage(url: string): Promise<boolean> {
+  const supabase = createClient()
+  const marker = '/object/public/photos/'
+  const idx = url.indexOf(marker)
+  if (idx === -1) return false
+  const path = url.slice(idx + marker.length)
+  const { error } = await supabase.storage.from('photos').remove([path])
+  return !error
 }

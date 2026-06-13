@@ -5,7 +5,11 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
-  images: { remotePatterns: [] },
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'ybjrmvvkasohslgsrhzh.supabase.co' },
+    ],
+  },
   async headers() {
     return [
       {

@@ -1,8 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import { Users, CheckCircle, XCircle, Clock, Image, Plus, ChevronDown } from 'lucide-react'
+import { useState, useRef } from 'react'
+import {
+  Users, CheckCircle, XCircle, Clock, Image as ImageIcon,
+  Plus, ChevronDown, ChevronUp, Pencil, Trash2, Upload, X, Check,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { uploadPhoto } from '@/lib/supabase/storage'
 
 interface Member {
   id: string
@@ -20,6 +24,15 @@ interface Album {
   id: string
   titre: string
   description: string | null
+  cover_url: string | null
+  created_at: string
+}
+
+interface Photo {
+  id: string
+  url: string
+  caption: string | null
+  created_at: string
 }
 
 interface Activity {
@@ -39,56 +52,212 @@ interface Props {
   stats: { totalMembers: number; pending: number; cotisationPaid: number }
 }
 
-export default function AdminDashboardClient({ user, profile, members: init, albums: initAlbums, activities: initActivities, stats }: Props) {
+function extractStoragePath(url: string): string {
+  const marker = '/object/public/photos/'
+  const idx = url.indexOf(marker)
+  return idx !== -1 ? url.slice(idx + marker.length) : ''
+}
+
+export default function AdminDashboardClient({
+  user,
+  profile,
+  members: initMembers,
+  albums: initAlbums,
+  activities: initActivities,
+  stats,
+}: Props) {
   const [tab, setTab] = useState<'membres' | 'albums' | 'activites'>('membres')
-  const [members, setMembers] = useState(init)
+  const [members, setMembers] = useState(initMembers)
   const [albums, setAlbums] = useState(initAlbums)
   const [activities, setActivities] = useState(initActivities)
 
-  // New album form
-  const [albumForm, setAlbumForm] = useState({ titre: '', description: '' })
+  // Album creation
   const [showAlbumForm, setShowAlbumForm] = useState(false)
+  const [albumForm, setAlbumForm] = useState({ titre: '', description: '' })
   const [savingAlbum, setSavingAlbum] = useState(false)
 
-  // New activity form
-  const [actForm, setActForm] = useState({ titre: '', description: '', date: '', instagram_url: '' })
+  // Album edit (inline)
+  const [editingAlbumId, setEditingAlbumId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({ titre: '', description: '' })
+  const [savingEdit, setSavingEdit] = useState(false)
+
+  // Album delete
+  const [deletingAlbumId, setDeletingAlbumId] = useState<string | null>(null)
+
+  // Album photos management (expanded)
+  const [expandedAlbumId, setExpandedAlbumId] = useState<string | null>(null)
+  const [albumPhotos, setAlbumPhotos] = useState<Record<string, Photo[]>>({})
+  const [loadingPhotos, setLoadingPhotos] = useState<Record<string, boolean>>({})
+  const [uploadingPhotos, setUploadingPhotos] = useState<Record<string, boolean>>({})
+  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null)
+  const [editCaptionId, setEditCaptionId] = useState<string | null>(null)
+  const [captionDraft, setCaptionDraft] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Activity creation
   const [showActForm, setShowActForm] = useState(false)
+  const [actForm, setActForm] = useState({ titre: '', description: '', date: '', instagram_url: '' })
   const [savingAct, setSavingAct] = useState(false)
 
   const supabase = createClient()
 
+  // ── Members ──────────────────────────────────────────────────
   const toggleValidation = async (id: string, current: boolean) => {
     await supabase.from('members').update({ is_validated: !current }).eq('id', id)
-    setMembers(members.map((m) => m.id === id ? { ...m, is_validated: !current } : m))
+    setMembers((m) => m.map((x) => (x.id === id ? { ...x, is_validated: !current } : x)))
   }
 
   const toggleCotisation = async (id: string, current: boolean) => {
     await supabase.from('members').update({ cotisation_payee: !current }).eq('id', id)
-    setMembers(members.map((m) => m.id === id ? { ...m, cotisation_payee: !current } : m))
+    setMembers((m) => m.map((x) => (x.id === id ? { ...x, cotisation_payee: !current } : x)))
   }
 
+  // ── Albums CRUD ───────────────────────────────────────────────
   const createAlbum = async () => {
     if (!albumForm.titre.trim()) return
     setSavingAlbum(true)
-    const { data } = await supabase.from('albums').insert({ ...albumForm, created_by: user.id }).select().single()
-    if (data) setAlbums([data, ...albums])
+    const { data } = await supabase
+      .from('albums')
+      .insert({ ...albumForm, created_by: user.id })
+      .select()
+      .single()
+    if (data) setAlbums([data as Album, ...albums])
     setAlbumForm({ titre: '', description: '' })
     setShowAlbumForm(false)
     setSavingAlbum(false)
   }
 
+  const startEditAlbum = (album: Album) => {
+    setEditingAlbumId(album.id)
+    setEditForm({ titre: album.titre, description: album.description ?? '' })
+  }
+
+  const saveEditAlbum = async (albumId: string) => {
+    if (!editForm.titre.trim()) return
+    setSavingEdit(true)
+    await supabase
+      .from('albums')
+      .update({ titre: editForm.titre, description: editForm.description || null })
+      .eq('id', albumId)
+    setAlbums((prev) =>
+      prev.map((a) =>
+        a.id === albumId
+          ? { ...a, titre: editForm.titre, description: editForm.description || null }
+          : a
+      )
+    )
+    setEditingAlbumId(null)
+    setSavingEdit(false)
+  }
+
+  const deleteAlbum = async (albumId: string) => {
+    const photos = albumPhotos[albumId] ?? []
+    for (const p of photos) {
+      const path = extractStoragePath(p.url)
+      if (path) await supabase.storage.from('photos').remove([path])
+    }
+    await supabase.from('albums').delete().eq('id', albumId)
+    setAlbums((prev) => prev.filter((a) => a.id !== albumId))
+    setDeletingAlbumId(null)
+    if (expandedAlbumId === albumId) setExpandedAlbumId(null)
+  }
+
+  // ── Photos management ─────────────────────────────────────────
+  const toggleExpand = async (albumId: string) => {
+    if (expandedAlbumId === albumId) {
+      setExpandedAlbumId(null)
+      return
+    }
+    setExpandedAlbumId(albumId)
+    if (!albumPhotos[albumId]) {
+      setLoadingPhotos((prev) => ({ ...prev, [albumId]: true }))
+      const { data } = await supabase
+        .from('photos')
+        .select('id, url, caption, created_at')
+        .eq('album_id', albumId)
+        .order('created_at', { ascending: true })
+      setAlbumPhotos((prev) => ({ ...prev, [albumId]: (data ?? []) as Photo[] }))
+      setLoadingPhotos((prev) => ({ ...prev, [albumId]: false }))
+    }
+  }
+
+  const handleUploadPhotos = async (albumId: string, files: FileList) => {
+    setUploadingPhotos((prev) => ({ ...prev, [albumId]: true }))
+    const newPhotos: Photo[] = []
+
+    for (const file of Array.from(files)) {
+      const url = await uploadPhoto(albumId, file)
+      if (url) {
+        const caption = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ')
+        const { data } = await supabase
+          .from('photos')
+          .insert({ album_id: albumId, url, caption, uploaded_by: user.id })
+          .select()
+          .single()
+        if (data) {
+          newPhotos.push(data as Photo)
+          if (!albums.find((a) => a.id === albumId)?.cover_url) {
+            await supabase.from('albums').update({ cover_url: url }).eq('id', albumId)
+            setAlbums((prev) =>
+              prev.map((a) => (a.id === albumId && !a.cover_url ? { ...a, cover_url: url } : a))
+            )
+          }
+        }
+      }
+    }
+
+    setAlbumPhotos((prev) => ({
+      ...prev,
+      [albumId]: [...(prev[albumId] ?? []), ...newPhotos],
+    }))
+    setUploadingPhotos((prev) => ({ ...prev, [albumId]: false }))
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const deletePhoto = async (photo: Photo, albumId: string) => {
+    setDeletingPhotoId(photo.id)
+    const path = extractStoragePath(photo.url)
+    if (path) await supabase.storage.from('photos').remove([path])
+    await supabase.from('photos').delete().eq('id', photo.id)
+    setAlbumPhotos((prev) => ({
+      ...prev,
+      [albumId]: (prev[albumId] ?? []).filter((p) => p.id !== photo.id),
+    }))
+    setDeletingPhotoId(null)
+  }
+
+  const startEditCaption = (photo: Photo) => {
+    setEditCaptionId(photo.id)
+    setCaptionDraft(photo.caption ?? '')
+  }
+
+  const saveCaption = async (photoId: string, albumId: string) => {
+    await supabase.from('photos').update({ caption: captionDraft || null }).eq('id', photoId)
+    setAlbumPhotos((prev) => ({
+      ...prev,
+      [albumId]: (prev[albumId] ?? []).map((p) =>
+        p.id === photoId ? { ...p, caption: captionDraft || null } : p
+      ),
+    }))
+    setEditCaptionId(null)
+  }
+
+  // ── Activities ────────────────────────────────────────────────
   const createActivity = async () => {
     if (!actForm.titre.trim()) return
     setSavingAct(true)
-    const payload = {
-      titre: actForm.titre,
-      description: actForm.description || null,
-      date: actForm.date || null,
-      instagram_url: actForm.instagram_url || null,
-      created_by: user.id,
-    }
-    const { data } = await supabase.from('activities').insert(payload).select().single()
-    if (data) setActivities([data, ...activities])
+    const { data } = await supabase
+      .from('activities')
+      .insert({
+        titre: actForm.titre,
+        description: actForm.description || null,
+        date: actForm.date || null,
+        instagram_url: actForm.instagram_url || null,
+        created_by: user.id,
+      })
+      .select()
+      .single()
+    if (data) setActivities([data as Activity, ...activities])
     setActForm({ titre: '', description: '', date: '', instagram_url: '' })
     setShowActForm(false)
     setSavingAct(false)
@@ -96,7 +265,7 @@ export default function AdminDashboardClient({ user, profile, members: init, alb
 
   const statCards = [
     { label: 'Total membres', value: stats.totalMembers, icon: Users, color: 'text-blue-600 bg-blue-50' },
-    { label: 'En attente validation', value: stats.pending, icon: Clock, color: 'text-orange-600 bg-orange-50' },
+    { label: 'En attente', value: stats.pending, icon: Clock, color: 'text-orange-600 bg-orange-50' },
     { label: 'Cotisation payée', value: stats.cotisationPaid, icon: CheckCircle, color: 'text-green-600 bg-green-50' },
   ]
 
@@ -104,7 +273,7 @@ export default function AdminDashboardClient({ user, profile, members: init, alb
     <div className="min-h-screen bg-gray-50">
       <header className="bg-green-700 text-white py-10">
         <div className="max-w-6xl mx-auto px-4">
-          <p className="text-green-300 text-sm uppercase tracking-widest mb-1">Dashboard Admin</p>
+          <p className="text-green-300 text-xs uppercase tracking-widest mb-1">Dashboard Admin</p>
           <h1 className="text-3xl font-black">
             {profile.member ? `${profile.member.prenom} ${profile.member.nom}` : 'Bureau Exécutif'}
           </h1>
@@ -130,13 +299,16 @@ export default function AdminDashboardClient({ user, profile, members: init, alb
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold capitalize transition-all ${tab === t ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold capitalize transition-all ${
+                tab === t ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+              }`}
             >
               {t === 'membres' ? 'Membres' : t === 'albums' ? 'Albums Photos' : 'Activités'}
             </button>
           ))}
         </div>
 
+        {/* ── MEMBRES ── */}
         {tab === 'membres' && (
           <div className="space-y-3">
             {members.map((m) => (
@@ -148,19 +320,16 @@ export default function AdminDashboardClient({ user, profile, members: init, alb
                   <p className="font-bold text-gray-900 text-sm">{m.prenom} {m.nom}</p>
                   <p className="text-gray-400 text-xs truncate">{m.filiere ?? m.statut}</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-shrink-0">
                   <span className={`text-xs px-2 py-1 rounded-full font-medium ${m.is_validated ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-600'}`}>
                     {m.is_validated ? 'Validé' : 'En attente'}
                   </span>
-                  <button
-                    onClick={() => toggleValidation(m.id, m.is_validated)}
-                    className="text-xs border border-gray-200 px-2 py-1 rounded-lg text-gray-600 hover:bg-gray-50"
-                  >
-                    {m.is_validated ? <XCircle size={14} /> : <CheckCircle size={14} />}
+                  <button onClick={() => toggleValidation(m.id, m.is_validated)} className="p-1.5 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">
+                    {m.is_validated ? <XCircle size={15} /> : <CheckCircle size={15} />}
                   </button>
                   <button
                     onClick={() => toggleCotisation(m.id, m.cotisation_payee)}
-                    className={`text-xs px-2 py-1 rounded-lg border ${m.cotisation_payee ? 'border-green-200 text-green-600' : 'border-red-200 text-red-500'}`}
+                    className={`text-xs px-2 py-1.5 rounded-lg border font-medium ${m.cotisation_payee ? 'border-green-200 text-green-600 bg-green-50' : 'border-red-200 text-red-500'}`}
                   >
                     Cotis.
                   </button>
@@ -170,74 +339,303 @@ export default function AdminDashboardClient({ user, profile, members: init, alb
           </div>
         )}
 
+        {/* ── ALBUMS ── */}
         {tab === 'albums' && (
           <div className="space-y-4">
             <div className="flex justify-end">
-              <button onClick={() => setShowAlbumForm(!showAlbumForm)} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-green-700">
+              <button
+                onClick={() => setShowAlbumForm(!showAlbumForm)}
+                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-green-700 transition-colors"
+              >
                 <Plus size={16} /> Nouvel album
               </button>
             </div>
+
             {showAlbumForm && (
               <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3">
-                <input placeholder="Titre de l'album" value={albumForm.titre} onChange={(e) => setAlbumForm({ ...albumForm, titre: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                <input placeholder="Description (optionnel)" value={albumForm.description} onChange={(e) => setAlbumForm({ ...albumForm, description: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                <input
+                  placeholder="Titre de l'album *"
+                  value={albumForm.titre}
+                  onChange={(e) => setAlbumForm({ ...albumForm, titre: e.target.value })}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+                <input
+                  placeholder="Description (optionnel)"
+                  value={albumForm.description}
+                  onChange={(e) => setAlbumForm({ ...albumForm, description: e.target.value })}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
                 <div className="flex gap-3">
-                  <button onClick={() => setShowAlbumForm(false)} className="flex-1 border border-gray-200 text-gray-600 py-2 rounded-xl text-sm font-semibold">Annuler</button>
-                  <button onClick={createAlbum} disabled={savingAlbum} className="flex-1 bg-green-600 text-white py-2 rounded-xl text-sm font-bold disabled:opacity-60">
+                  <button onClick={() => setShowAlbumForm(false)} className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-semibold">
+                    Annuler
+                  </button>
+                  <button onClick={createAlbum} disabled={savingAlbum} className="flex-1 bg-green-600 text-white py-2.5 rounded-xl text-sm font-bold disabled:opacity-60">
                     {savingAlbum ? 'Création...' : 'Créer'}
                   </button>
                 </div>
               </div>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {albums.map((a) => (
-                <div key={a.id} className="bg-white rounded-2xl border border-gray-100 p-5">
-                  <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center mb-3">
-                    <Image size={20} className="text-green-600" />
-                  </div>
-                  <p className="font-bold text-gray-900">{a.titre}</p>
-                  {a.description && <p className="text-gray-500 text-sm mt-1">{a.description}</p>}
+
+            {albums.length === 0 && !showAlbumForm && (
+              <div className="bg-white rounded-2xl border border-gray-100 p-10 text-center text-gray-400">
+                <ImageIcon size={40} className="mx-auto mb-3 text-gray-200" />
+                <p className="text-sm">Aucun album. Créez-en un pour commencer.</p>
+              </div>
+            )}
+
+            {albums.map((album) => (
+              <div key={album.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                <div className="p-5">
+                  {editingAlbumId === album.id ? (
+                    <div className="space-y-3">
+                      <input
+                        value={editForm.titre}
+                        onChange={(e) => setEditForm({ ...editForm, titre: e.target.value })}
+                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                      <input
+                        value={editForm.description}
+                        onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                        placeholder="Description (optionnel)"
+                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                      <div className="flex gap-2">
+                        <button onClick={() => setEditingAlbumId(null)} className="flex items-center gap-1.5 border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg text-sm">
+                          <X size={14} /> Annuler
+                        </button>
+                        <button onClick={() => saveEditAlbum(album.id)} disabled={savingEdit} className="flex items-center gap-1.5 bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold disabled:opacity-60">
+                          <Check size={14} /> Enregistrer
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-4">
+                      {album.cover_url ? (
+                        <img src={album.cover_url} alt={album.titre} className="w-16 h-16 object-cover rounded-xl flex-shrink-0" />
+                      ) : (
+                        <div className="w-16 h-16 bg-green-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <ImageIcon size={24} className="text-green-400" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-gray-900">{album.titre}</p>
+                        {album.description && (
+                          <p className="text-gray-500 text-sm mt-0.5">{album.description}</p>
+                        )}
+                        <p className="text-gray-400 text-xs mt-1">
+                          {new Date(album.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <button
+                          onClick={() => startEditAlbum(album)}
+                          title="Modifier"
+                          className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          onClick={() => setDeletingAlbumId(album.id)}
+                          title="Supprimer"
+                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                        <button
+                          onClick={() => toggleExpand(album.id)}
+                          className="flex items-center gap-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+                        >
+                          {expandedAlbumId === album.id ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                          Photos
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {deletingAlbumId === album.id && (
+                    <div className="mt-4 p-4 bg-red-50 border border-red-100 rounded-xl">
+                      <p className="text-sm font-semibold text-red-700 mb-3">
+                        Supprimer l'album « {album.titre} » ? Toutes les photos seront supprimées.
+                      </p>
+                      <div className="flex gap-2">
+                        <button onClick={() => setDeletingAlbumId(null)} className="flex-1 border border-gray-200 text-gray-600 py-2 rounded-lg text-sm">
+                          Annuler
+                        </button>
+                        <button onClick={() => deleteAlbum(album.id)} className="flex-1 bg-red-500 text-white py-2 rounded-lg text-sm font-bold hover:bg-red-600">
+                          Supprimer définitivement
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
+
+                {expandedAlbumId === album.id && (
+                  <div className="border-t border-gray-100 p-5 bg-gray-50">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-sm font-semibold text-gray-700">
+                        Photos ({(albumPhotos[album.id] ?? []).length})
+                      </p>
+                      <label
+                        className={`flex items-center gap-1.5 bg-green-600 text-white px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
+                          uploadingPhotos[album.id] ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:bg-green-700'
+                        }`}
+                      >
+                        {uploadingPhotos[album.id] ? (
+                          <>
+                            <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            Upload...
+                          </>
+                        ) : (
+                          <>
+                            <Upload size={13} />
+                            Ajouter photos
+                          </>
+                        )}
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          disabled={uploadingPhotos[album.id]}
+                          onChange={(e) => e.target.files && handleUploadPhotos(album.id, e.target.files)}
+                        />
+                      </label>
+                    </div>
+
+                    {loadingPhotos[album.id] ? (
+                      <p className="text-center text-sm text-gray-400 py-6">Chargement...</p>
+                    ) : (albumPhotos[album.id] ?? []).length === 0 ? (
+                      <p className="text-center text-sm text-gray-400 py-6">Aucune photo dans cet album.</p>
+                    ) : (
+                      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+                        {(albumPhotos[album.id] ?? []).map((photo) => (
+                          <div key={photo.id} className="group relative">
+                            <div className="aspect-square overflow-hidden rounded-lg bg-gray-200">
+                              <img
+                                src={photo.url}
+                                alt={photo.caption ?? ''}
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                              />
+                            </div>
+                            <div className="absolute inset-0 bg-black/60 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 p-1">
+                              <button
+                                onClick={() => startEditCaption(photo)}
+                                className="flex items-center gap-1 bg-white/20 hover:bg-white/30 text-white px-2 py-1 rounded text-xs backdrop-blur-sm"
+                              >
+                                <Pencil size={11} /> Légende
+                              </button>
+                              <button
+                                onClick={() => deletePhoto(photo, album.id)}
+                                disabled={deletingPhotoId === photo.id}
+                                className="flex items-center gap-1 bg-red-500/80 hover:bg-red-600 text-white px-2 py-1 rounded text-xs disabled:opacity-60"
+                              >
+                                <Trash2 size={11} />
+                                {deletingPhotoId === photo.id ? '...' : 'Suppr.'}
+                              </button>
+                            </div>
+                            {editCaptionId === photo.id && (
+                              <div className="absolute inset-0 bg-white rounded-lg p-2 flex flex-col gap-1.5 shadow-lg z-10">
+                                <input
+                                  value={captionDraft}
+                                  onChange={(e) => setCaptionDraft(e.target.value)}
+                                  placeholder="Légende..."
+                                  className="flex-1 border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-green-500"
+                                  autoFocus
+                                />
+                                <div className="flex gap-1">
+                                  <button onClick={() => setEditCaptionId(null)} className="flex-1 border border-gray-200 text-gray-500 py-1 rounded text-xs">
+                                    ✕
+                                  </button>
+                                  <button onClick={() => saveCaption(photo.id, album.id)} className="flex-1 bg-green-600 text-white py-1 rounded text-xs font-bold">
+                                    ✓
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                            {photo.caption && editCaptionId !== photo.id && (
+                              <p className="text-xs text-gray-500 mt-1 truncate">{photo.caption}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
 
+        {/* ── ACTIVITES ── */}
         {tab === 'activites' && (
           <div className="space-y-4">
             <div className="flex justify-end">
-              <button onClick={() => setShowActForm(!showActForm)} className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-green-700">
+              <button
+                onClick={() => setShowActForm(!showActForm)}
+                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-green-700"
+              >
                 <Plus size={16} /> Nouvelle activité
               </button>
             </div>
+
             {showActForm && (
               <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3">
-                <input placeholder="Titre *" value={actForm.titre} onChange={(e) => setActForm({ ...actForm, titre: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                <textarea placeholder="Description" value={actForm.description} onChange={(e) => setActForm({ ...actForm, description: e.target.value })} rows={3} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
-                <input type="date" value={actForm.date} onChange={(e) => setActForm({ ...actForm, date: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                <input placeholder="Lien post Instagram (optionnel)" value={actForm.instagram_url} onChange={(e) => setActForm({ ...actForm, instagram_url: e.target.value })} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                <input
+                  placeholder="Titre *"
+                  value={actForm.titre}
+                  onChange={(e) => setActForm({ ...actForm, titre: e.target.value })}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+                <textarea
+                  placeholder="Description"
+                  value={actForm.description}
+                  onChange={(e) => setActForm({ ...actForm, description: e.target.value })}
+                  rows={3}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                />
+                <input
+                  type="date"
+                  value={actForm.date}
+                  onChange={(e) => setActForm({ ...actForm, date: e.target.value })}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+                <input
+                  placeholder="Lien Instagram (optionnel)"
+                  value={actForm.instagram_url}
+                  onChange={(e) => setActForm({ ...actForm, instagram_url: e.target.value })}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
                 <div className="flex gap-3">
-                  <button onClick={() => setShowActForm(false)} className="flex-1 border border-gray-200 text-gray-600 py-2 rounded-xl text-sm font-semibold">Annuler</button>
-                  <button onClick={createActivity} disabled={savingAct} className="flex-1 bg-green-600 text-white py-2 rounded-xl text-sm font-bold disabled:opacity-60">
+                  <button onClick={() => setShowActForm(false)} className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-semibold">
+                    Annuler
+                  </button>
+                  <button onClick={createActivity} disabled={savingAct} className="flex-1 bg-green-600 text-white py-2.5 rounded-xl text-sm font-bold disabled:opacity-60">
                     {savingAct ? 'Création...' : 'Publier'}
                   </button>
                 </div>
               </div>
             )}
+
             {activities.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center text-gray-400">
+              <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center text-gray-400 text-sm">
                 Aucune activité publiée.
               </div>
             ) : (
               <div className="space-y-3">
                 {activities.map((a) => (
                   <div key={a.id} className="bg-white rounded-xl border border-gray-100 p-4">
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="font-bold text-gray-900">{a.titre}</p>
                         {a.description && <p className="text-gray-500 text-sm mt-1">{a.description}</p>}
                       </div>
-                      {a.date && <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-lg">{new Date(a.date).toLocaleDateString('fr-FR')}</span>}
+                      {a.date && (
+                        <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-lg flex-shrink-0">
+                          {new Date(a.date).toLocaleDateString('fr-FR')}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}
