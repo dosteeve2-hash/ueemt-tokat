@@ -152,6 +152,11 @@ export default function ProfilClient({ profile, member, userId }: Props) {
             <label htmlFor="bio" className="block text-sm font-semibold text-gray-700 mb-1.5">
               Bio
             </label>
+            {!bio && (
+              <div className="mb-2 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-sm text-amber-700">
+                ✏️ Ajoute une courte présentation pour que tes camarades te connaissent mieux !
+              </div>
+            )}
             <textarea
               id="bio"
               name="bio"
@@ -159,7 +164,7 @@ export default function ProfilClient({ profile, member, userId }: Props) {
               value={bio}
               onChange={e => setBio(e.target.value)}
               maxLength={500}
-              placeholder="Quelques mots sur toi, ta filière, tes centres d'intérêt…"
+              placeholder="Ex : Étudiant en génie civil à GOP, passionné de football et de musique mandingue…"
               className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
             />
             <p className="text-xs text-gray-400 mt-1 text-right">{bio.length}/500</p>
@@ -169,6 +174,11 @@ export default function ProfilClient({ profile, member, userId }: Props) {
             <label htmlFor="quote" className="block text-sm font-semibold text-gray-700 mb-1.5">
               Citation / devise
             </label>
+            {!quote && (
+              <p className="text-xs text-gray-400 mb-1.5">
+                💬 Une phrase qui te représente — proverbe, citation, valeur personnelle.
+              </p>
+            )}
             <input
               id="quote"
               name="quote"
@@ -176,7 +186,7 @@ export default function ProfilClient({ profile, member, userId }: Props) {
               value={quote}
               onChange={e => setQuote(e.target.value)}
               maxLength={200}
-              placeholder="Ta citation préférée ou ta devise…"
+              placeholder="Ex : « L'éducation est l'arme la plus puissante. » — Mandela"
               className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
             />
           </div>

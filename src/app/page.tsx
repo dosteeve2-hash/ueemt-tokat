@@ -9,12 +9,17 @@ export default async function HomePage() {
   let heroTitle = 'UEEMT-TOKAT'
   let heroSubtitle = "Union des Élèves et Étudiants Maliens à Tokat"
   let heroTagline = 'Travail – Solidarité – Réussite'
+  let isLoggedIn = false
 
   try {
     const supabase = await createClient()
-    const { data } = await supabase.from('site_settings').select('key, value')
-    if (data) {
-      const map = Object.fromEntries(data.map((r) => [r.key, r.value ?? '']))
+    const [{ data: settings }, { data: { user } }] = await Promise.all([
+      supabase.from('site_settings').select('key, value'),
+      supabase.auth.getUser(),
+    ])
+    isLoggedIn = !!user
+    if (settings) {
+      const map = Object.fromEntries(settings.map((r) => [r.key, r.value ?? '']))
       if (map.hero_title) heroTitle = map.hero_title
       if (map.hero_subtitle) heroSubtitle = map.hero_subtitle
       if (map.hero_tagline) heroTagline = map.hero_tagline
@@ -114,14 +119,31 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* CTA */}
+      {/* CTA — adaptive selon statut de connexion */}
       <section className="py-16 sm:py-20" style={{ background: 'linear-gradient(135deg, #14A44D, #0a7a35)' }}>
         <div className="max-w-3xl mx-auto px-4 text-center text-white">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">Rejoignez la communauté UEEMT-Tokat</h2>
-          <p className="text-green-100 mb-8 text-base sm:text-lg">Recensez-vous pour faire partie officiellement de notre association et accéder à tous nos services.</p>
-          <Link href="/recensement" className="bg-white text-green-700 hover:bg-green-50 px-8 sm:px-10 py-4 rounded-xl font-bold text-base sm:text-lg inline-block transition-colors shadow-lg">
-            Se Recenser →
-          </Link>
+          {isLoggedIn ? (
+            <>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">Bienvenue dans ta communauté</h2>
+              <p className="text-green-100 mb-8 text-base sm:text-lg">Explore l'espace membre, partage tes moments et retrouve tes camarades.</p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link href="/feed" className="bg-white text-green-700 hover:bg-green-50 px-8 py-4 rounded-xl font-bold text-base inline-block transition-colors shadow-lg">
+                  📰 Voir le fil d&apos;actu
+                </Link>
+                <Link href="/activites" className="bg-green-700/50 hover:bg-green-700/70 text-white border border-white/20 px-8 py-4 rounded-xl font-bold text-base inline-block transition-colors">
+                  🎉 Explorer les activités
+                </Link>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">Rejoignez la communauté UEEMT-Tokat</h2>
+              <p className="text-green-100 mb-8 text-base sm:text-lg">Recensez-vous pour faire partie officiellement de notre association et accéder à tous nos services.</p>
+              <Link href="/recensement" className="bg-white text-green-700 hover:bg-green-50 px-8 sm:px-10 py-4 rounded-xl font-bold text-base sm:text-lg inline-block transition-colors shadow-lg">
+                Se Recenser →
+              </Link>
+            </>
+          )}
         </div>
       </section>
     </>

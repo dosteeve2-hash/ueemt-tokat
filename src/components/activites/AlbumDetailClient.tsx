@@ -90,10 +90,18 @@ export default function AlbumDetailClient({ album, photos }: Props) {
 
       <div className="max-w-7xl mx-auto px-4 py-8 sm:py-10">
         {photos.length === 0 ? (
-          <div className="text-center py-24 text-gray-400">
-            <ImageIcon size={48} className="mx-auto mb-4 text-gray-200" />
-            <p className="text-lg font-medium">Aucune photo dans cet album.</p>
-            <p className="text-sm mt-1">Les membres peuvent en ajouter depuis leur dashboard.</p>
+          <div className="text-center py-24">
+            <div className="text-5xl mb-4">📷</div>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Cet album attend vos souvenirs</h3>
+            <p className="text-gray-500 text-sm mb-6 max-w-sm mx-auto">
+              Les membres peuvent ajouter leurs photos depuis leur espace personnel.
+            </p>
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full font-semibold transition-colors"
+            >
+              <ImageIcon size={16} /> Ajouter une photo
+            </Link>
           </div>
         ) : (
           <div className="columns-2 sm:columns-3 lg:columns-4 gap-2 sm:gap-3 space-y-2 sm:space-y-3">

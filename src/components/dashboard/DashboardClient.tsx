@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { User, FileText, Image, Calendar } from 'lucide-react'
+import Link from 'next/link'
+import { User, FileText, Image, Calendar, CheckCircle, Circle } from 'lucide-react'
 import ProfileTab from './ProfileTab'
 import DocumentsTab from './DocumentsTab'
 import PhotosTab from './PhotosTab'
@@ -72,6 +73,44 @@ export default function DashboardClient({ user, profile, documents, albums }: Pr
       </header>
 
       <div className="max-w-5xl mx-auto px-4 py-5 sm:py-6">
+        {/* Onboarding checklist */}
+        {(!profile.bio || !profile.avatar_url) && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-5">
+            <p className="font-bold text-amber-800 mb-3">👋 Bienvenue ! Voici tes premières étapes :</p>
+            <ul className="space-y-2.5">
+              <li className="flex items-center gap-3">
+                {profile.avatar_url ? <CheckCircle size={18} className="text-green-500 flex-shrink-0" /> : <Circle size={18} className="text-amber-400 flex-shrink-0" />}
+                <span className={`text-sm ${profile.avatar_url ? 'line-through text-gray-400' : 'text-amber-800'}`}>
+                  Ajoute une photo de profil
+                </span>
+                {!profile.avatar_url && (
+                  <Link href="/profil" className="ml-auto text-xs bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded-full font-semibold transition-colors whitespace-nowrap">
+                    Compléter →
+                  </Link>
+                )}
+              </li>
+              <li className="flex items-center gap-3">
+                {profile.bio ? <CheckCircle size={18} className="text-green-500 flex-shrink-0" /> : <Circle size={18} className="text-amber-400 flex-shrink-0" />}
+                <span className={`text-sm ${profile.bio ? 'line-through text-gray-400' : 'text-amber-800'}`}>
+                  Écris une courte bio
+                </span>
+                {!profile.bio && (
+                  <Link href="/profil" className="ml-auto text-xs bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded-full font-semibold transition-colors whitespace-nowrap">
+                    Compléter →
+                  </Link>
+                )}
+              </li>
+              <li className="flex items-center gap-3">
+                <Circle size={18} className="text-amber-400 flex-shrink-0" />
+                <span className="text-sm text-amber-800">Présente-toi dans le fil d&apos;actu</span>
+                <Link href="/feed" className="ml-auto text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-full font-semibold transition-colors whitespace-nowrap">
+                  Dire bonjour →
+                </Link>
+              </li>
+            </ul>
+          </div>
+        )}
+
         {/* Tabs — scrollable on mobile */}
         <div className="overflow-x-auto mb-5 sm:mb-6">
           <div className="flex gap-1 bg-white rounded-xl border border-gray-100 p-1 min-w-max">

@@ -1,0 +1,136 @@
+# CLAUDE.md — UEEMT-Tokat
+
+Projet : site web de l'Union des Élèves et Étudiants Maliens à Tokat (Turquie).
+
+Stack : Next.js 16 App Router · TypeScript strict · Tailwind CSS · Supabase (Auth + DB + Storage) · Vercel
+
+---
+
+## Architecture
+
+```
+src/app/              — Pages (App Router)
+  (auth)/             — Layout sans Navbar (connexion, recensement)
+  auth/callback/      — Échange PKCE code → session
+  dashboard/          — Espace membre (tabs : profil, docs, photos)
+  dashboard/admin/    — Admin (validation membres, contenu)
+  feed/               — Fil d'actualité (posts + likes)
+  membres/            — Grille des membres publics
+  membres/[id]/       — Profil public d'un membre
+  profil/             — Édition de son propre profil
+  activites/          — Albums photos
+  activites/[id]/     — Détail album + lightbox
+
+src/components/       — Composants réutilisables
+  Navbar.tsx          — Nav responsive (liens conditionnels selon auth)
+  HeroSlideshow.tsx   — Carousel hero avec fallback gradient
+  FeedClient.tsx      — Feed avec optimistic UI
+  MembresClient.tsx   — Grille membres
+  ProfilClient.tsx    — Edit profil avec upload avatar
+  dashboard/          — Tabs du dashboard
+  activites/          — AlbumGrid, AlbumDetailClient (lightbox)
+
+src/lib/supabase/     — Clients Supabase (server.ts, client.ts)
+src/lib/constants.ts  — BUREAU_MEMBERS, constantes globales
+```
+
+## Tables Supabase clés
+
+- `members` — recensement (prenom, nom, filiere, is_validated)
+- `user_profiles` — profil social (avatar_url, bio, quote, is_public, role)
+- `feed_posts` — posts du fil d'actu (is_pinned pour annonces bureau)
+- `feed_likes` — likes par user
+- `albums` + `album_photos` — galerie photos
+- `documents` — documents membres
+- `site_settings` — config hero (key/value)
+
+RLS activé sur toutes les tables. `WITH CHECK` obligatoire sur INSERT/UPDATE.
+
+## Auth
+
+Magic link uniquement (pas de mot de passe).
+Callback : `/auth/callback/route.ts` — gère les deux formats :
+- `?code=` → `exchangeCodeForSession(code)` (PKCE)
+- `?token_hash=&type=` → `verifyOtp(...)` (OTP)
+
+Email custom via Resend + Admin API (`generateLink` ne déclenche pas l'email Supabase).
+Fallback : `signInWithOtp` si `SUPABASE_SERVICE_ROLE_KEY` absent/invalide.
+
+## Variables d'environnement requises
+
+```
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY      # JWT commençant par eyJ
+RESEND_API_KEY                 # Pour emails custom
+NEXT_PUBLIC_SITE_URL           # https://ueemt-tokat.vercel.app
+```
+
+---
+
+## Règle UX permanente — ZÉRO EMPTY STATES
+
+**Jamais d'état vide sans CTA engageant.** Toute section sans contenu doit proposer une action.
+
+### Pattern obligatoire
+
+```tsx
+{items.length === 0 ? (
+  <div className="rounded-2xl border p-16 text-center">
+    <div className="text-5xl mb-4">🎯</div>
+    <h3 className="text-xl font-bold mb-2">Titre accrocheur</h3>
+    <p className="text-gray-500 text-sm mb-6 max-w-sm mx-auto">
+      Description courte + invitation à agir.
+    </p>
+    <Link href="/action" className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full font-semibold">
+      Action principale
+    </Link>
+  </div>
+) : (
+  // contenu normal
+)}
+```
+
+### Implémentations existantes
+
+| Page / composant | État vide → CTA |
+|---|---|
+| `/feed` (FeedClient) | 📸 "Sois le premier à partager !" → focus textarea |
+| `/membres` (MembresClient) | 🌍 "La famille arrive bientôt !" → Se recenser |
+| Album sans photos (AlbumDetailClient) | 📷 "Cet album attend vos souvenirs" → /dashboard |
+| Dashboard (DashboardClient) | Checklist onboarding si pas de bio ou avatar |
+| Profil sans bio (ProfilClient) | Bannière amber d'invitation à compléter |
+| Page d'accueil (page.tsx) | CTA conditionnel : "Se recenser" (visiteur) ou "Fil d'actu + Activités" (connecté) |
+
+### Règle de contenu
+
+- Emoji grande taille (text-4xl ou text-5xl) — donne de la vie
+- Titre en `font-bold` ou `font-black`
+- Description courte en `text-gray-500 text-sm`
+- CTA en `rounded-full` avec couleur green-600 (primaire) ou amber (second)
+- Jamais d'icône grise seule + texte plat
+
+---
+
+## Charte visuelle (ueemt-tokat)
+
+- Couleur primaire : `green-600` (#14A44D)
+- Background pages : `bg-gray-50` / cartes : `bg-white`
+- Radius : `rounded-xl` (16px) ou `rounded-2xl` (20px)
+- Typographie : Tailwind defaults (pas de Playfair ici — association malienne, style clean)
+- Badges statuts : `bg-green-100 text-green-700` (admin/validé), `bg-gray-100 text-gray-500` (membre standard)
+
+---
+
+## Sécurité
+
+- Headers HTTP configurés dans `next.config.ts` : X-Frame-Options, CSP, nosniff, Referrer-Policy
+- `poweredByHeader: false`
+- RLS strict sur toutes les tables avec `WITH CHECK`
+- Storage avatars : ownership enforced via `(auth.uid())::text = (storage.foldername(name))[1]`
+- Validation Zod côté serveur sur toutes les Server Actions
+- `stripBom` sur toutes les env vars lues (Windows PowerShell injecte U+FEFF)
+
+---
+
+*Maintenu par Steve Donald Compaoré — dernière mise à jour : 2026-06-13*

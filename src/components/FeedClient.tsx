@@ -177,11 +177,20 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
           />
         ))}
 
-        {/* Regular posts */}
+        {/* Empty state with CTA */}
         {regularPosts.length === 0 && pinnedPosts.length === 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center text-gray-400">
-            <p className="text-lg font-medium">Aucune publication pour le moment.</p>
-            <p className="text-sm mt-1">Sois le premier à partager quelque chose !</p>
+          <div className="bg-white rounded-2xl border border-gray-100 py-16 px-6 text-center shadow-sm">
+            <div className="text-5xl mb-4">📸</div>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Sois le premier à partager !</h3>
+            <p className="text-gray-500 mb-6 max-w-sm mx-auto text-sm leading-relaxed">
+              Partage un souvenir, une pensée, un moment fort avec tes camarades de l&apos;UEEMT-Tokat.
+            </p>
+            <button
+              onClick={() => textareaRef.current?.focus()}
+              className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full font-semibold transition-colors"
+            >
+              ✍️ Créer le premier post
+            </button>
           </div>
         )}
 

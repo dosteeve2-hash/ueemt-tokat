@@ -45,9 +45,18 @@ export default function MembresClient({ membres, isAdmin, currentUserId }: Props
 
       <div className="max-w-7xl mx-auto px-4 py-10">
         {membres.length === 0 ? (
-          <div className="bg-gray-50 rounded-2xl border border-gray-100 p-16 text-center text-gray-400">
-            <Users size={48} className="mx-auto mb-4 text-gray-200" />
-            <p className="text-lg font-medium">Aucun membre validé pour le moment.</p>
+          <div className="bg-green-50 rounded-2xl border border-green-100 p-16 text-center">
+            <div className="text-5xl mb-4">🌍</div>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">La famille arrive bientôt !</h3>
+            <p className="text-gray-500 text-sm mb-6 max-w-sm mx-auto">
+              Les membres rejoignent progressivement notre espace. Bienvenue dans la famille UEEMT-Tokat !
+            </p>
+            <a
+              href="/recensement"
+              className="inline-block bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full font-semibold transition-colors"
+            >
+              Se recenser maintenant
+            </a>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
