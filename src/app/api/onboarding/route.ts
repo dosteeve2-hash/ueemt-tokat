@@ -20,11 +20,12 @@ export async function POST(req: NextRequest) {
 
     const role = isBureauMember(prenom, nom) ? 'admin' : 'member'
 
-    const { error } = await supabase.from('user_profiles').insert({
+    const { error } = await supabase.from('user_profiles').upsert({
       id: user.id,
       member_id: memberId,
       role,
-    })
+      onboarding_complete: true,
+    }, { onConflict: 'id' })
 
     if (error) {
       if (error.code === '23505') {

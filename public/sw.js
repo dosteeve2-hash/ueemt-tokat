@@ -27,6 +27,32 @@ self.addEventListener('activate', (e) => {
   self.clients.claim()
 })
 
+self.addEventListener('push', (e) => {
+  if (!e.data) return
+  let data = { title: 'UEEMT-Tokat', body: 'Nouveau message', url: '/feed' }
+  try { data = JSON.parse(e.data.text()) } catch {}
+  e.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: '/icons/icon-192x192.png',
+      badge: '/icons/icon-192x192.png',
+      data: { url: data.url },
+    })
+  )
+})
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close()
+  const url = e.notification.data?.url ?? '/'
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cs) => {
+      const existing = cs.find((c) => c.url.includes(url) && 'focus' in c)
+      if (existing) return existing.focus()
+      return clients.openWindow(url)
+    })
+  )
+})
+
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return
 

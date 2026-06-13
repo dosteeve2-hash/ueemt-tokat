@@ -15,6 +15,18 @@ export async function createPost(content: string) {
     type: 'post',
   })
   if (error) throw new Error(error.message)
+
+  // Fire-and-forget push notification
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://ueemt-tokat.vercel.app'
+  fetch(`${siteUrl}/api/notify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      title: 'UEEMT-Tokat',
+      message: 'Nouveau post dans le fil d\'actu',
+      url: '/feed',
+    }),
+  }).catch(() => {})
 }
 
 export async function deletePost(postId: string) {

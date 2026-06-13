@@ -18,23 +18,38 @@ export default async function ActivitesPage() {
     instagram_url: string | null
     created_at: string
   }[] = []
+  let isAdmin = false
+  let userId: string | null = null
 
   try {
     const supabase = await createClient()
 
-    const { data: a } = await supabase
-      .from('albums')
-      .select('id, titre, description, cover_url, created_at, photos(count)')
-      .eq('is_public', true)
-      .order('created_at', { ascending: false })
-    albums = (a ?? []) as typeof albums
+    const [{ data: a }, { data: act }, { data: { user } }] = await Promise.all([
+      supabase
+        .from('albums')
+        .select('id, titre, description, cover_url, created_at, photos(count)')
+        .eq('is_public', true)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('activities')
+        .select('id, titre, description, date, instagram_url, created_at')
+        .order('created_at', { ascending: false }),
+      supabase.auth.getUser(),
+    ])
 
-    const { data: act } = await supabase
-      .from('activities')
-      .select('id, titre, description, date, instagram_url, created_at')
-      .order('created_at', { ascending: false })
+    albums = (a ?? []) as typeof albums
     activities = act ?? []
+    userId = user?.id ?? null
+
+    if (user) {
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      isAdmin = profile?.role === 'admin'
+    }
   } catch {}
 
-  return <ActivitesClient albums={albums} activities={activities} />
+  return <ActivitesClient albums={albums} activities={activities} isAdmin={isAdmin} userId={userId} />
 }

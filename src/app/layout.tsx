@@ -6,6 +6,7 @@ import Footer from '@/components/Footer'
 import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistration'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import { LanguageProvider } from '@/contexts/LanguageContext'
+import PushNotificationSetup from '@/components/PushNotificationSetup'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -55,6 +56,7 @@ export default function RootLayout({
             <ServiceWorkerRegistration />
             <Navbar />
             <main>{children}</main>
+            <PushNotificationSetup />
             <Footer />
           </LanguageProvider>
         </ThemeProvider>

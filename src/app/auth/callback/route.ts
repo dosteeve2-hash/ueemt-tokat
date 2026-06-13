@@ -19,11 +19,23 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createClient()
 
+  async function resolveRedirect(): Promise<string> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return '/connexion?error=lien_invalide'
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('onboarding_complete')
+      .eq('id', user.id)
+      .maybeSingle()
+    if (!profile || !profile.onboarding_complete) return '/onboarding'
+    return next
+  }
+
   // PKCE flow (newer Supabase / Admin generateLink)
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      return NextResponse.redirect(new URL(next, origin))
+      return NextResponse.redirect(new URL(await resolveRedirect(), origin))
     }
   }
 
@@ -31,7 +43,7 @@ export async function GET(request: NextRequest) {
   if (token_hash && type) {
     const { error } = await supabase.auth.verifyOtp({ type, token_hash })
     if (!error) {
-      return NextResponse.redirect(new URL(next, origin))
+      return NextResponse.redirect(new URL(await resolveRedirect(), origin))
     }
   }
 
