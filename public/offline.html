@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UEEMT-Tokat — Hors ligne</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: #f0fdf4;
+      padding: 20px;
+    }
+    .card {
+      text-align: center;
+      padding: 48px 40px;
+      background: white;
+      border-radius: 24px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+      max-width: 360px;
+      width: 100%;
+    }
+    .icon { font-size: 72px; margin-bottom: 20px; display: block; }
+    .logo {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin: 0 auto 20px;
+      border: 3px solid #14A44D;
+    }
+    h1 {
+      color: #14A44D;
+      font-size: 1.75rem;
+      font-weight: 800;
+      margin-bottom: 12px;
+    }
+    p {
+      color: #6b7280;
+      line-height: 1.7;
+      font-size: 0.9rem;
+      margin-bottom: 8px;
+    }
+    .hint {
+      color: #9ca3af;
+      font-size: 0.8rem;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #f3f4f6;
+    }
+    button {
+      background: #14A44D;
+      color: white;
+      border: none;
+      padding: 14px 36px;
+      border-radius: 50px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 24px;
+      transition: background 0.2s;
+      width: 100%;
+    }
+    button:hover { background: #0a7a35; }
+    .available {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 20px;
+    }
+    .available a {
+      color: #14A44D;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid #bbf7d0;
+      background: #f0fdf4;
+      transition: background 0.15s;
+    }
+    .available a:hover { background: #dcfce7; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="icon">📡</span>
+    <h1>Hors connexion</h1>
+    <p>Vous n'avez pas accès à Internet en ce moment.</p>
+    <p>Certaines pages sont disponibles hors ligne :</p>
+    <div class="available">
+      <a href="/">🏠 Accueil</a>
+      <a href="/membres">👥 Membres</a>
+      <a href="/activites">🎉 Activités</a>
+      <a href="/a-propos">ℹ️ À propos</a>
+    </div>
+    <button onclick="location.reload()">🔄 Réessayer la connexion</button>
+    <p class="hint">UEEMT-Tokat — Union des Élèves et Étudiants Maliens à Tokat</p>
+  </div>
+</body>
+</html>
