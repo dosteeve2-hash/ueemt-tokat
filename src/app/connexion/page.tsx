@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { createBrowserClient } from '@supabase/ssr'
 import { Mail, CheckCircle } from 'lucide-react'
 
 export default function ConnexionPage() {
@@ -16,34 +16,55 @@ export default function ConnexionPage() {
     setLoading(true)
     setError('')
 
-    const supabase = createClient()
-
-    // Clear any stored session before attempting sign-in.
-    // A corrupted cookie from a previous session can contain non-ASCII bytes
-    // that end up in the Authorization header, causing a browser fetch error.
+    // Purge all Supabase auth cookies and localStorage BEFORE creating any client.
+    //
+    // Root cause: supabase-js wraps every fetch in fetchWithAuth(), which calls
+    // getSession() to read the stored access_token and injects it as
+    // "Authorization: Bearer <token>" on every request. If a previously stored
+    // session cookie contains a non-ISO-8859-1 character (corrupted token), the
+    // browser's Headers API throws "String contains non ISO-8859-1 code point"
+    // before the request even leaves the browser.
+    //
+    // signOut({ scope: 'local' }) does NOT fix this because it tries to make a
+    // DELETE network call using the corrupt token first, which throws, and then
+    // _removeSession() is never reached — leaving the bad cookie in place.
+    //
+    // The only reliable fix: wipe storage directly, then create a fresh client
+    // that initialises from the now-empty storage (no corrupted token to inject).
     try {
-      await supabase.auth.signOut({ scope: 'local' })
+      const prefix = 'sb-'
+      // Clear auth cookies
+      document.cookie.split(';').forEach((c) => {
+        const name = c.split('=')[0].trim()
+        if (name.startsWith(prefix)) {
+          document.cookie = `${name}=; Max-Age=0; path=/; SameSite=Lax`
+        }
+      })
+      // Clear auth localStorage entries (fallback storage)
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith(prefix))
+        .forEach((k) => localStorage.removeItem(k))
     } catch {
-      // signOut may fail if there is no session — safe to ignore
+      // Storage access can be restricted in certain browser contexts — ignore.
     }
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin
-    const redirectTo = `${siteUrl}/dashboard`
+    // Fresh non-singleton client: reads from the now-empty storage, so
+    // currentSession = null and getAccessToken() falls back to the anon key (ASCII).
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { isSingleton: false }
+    )
 
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin
     const { error: err } = await supabase.auth.signInWithOtp({
       email: email.trim(),
-      options: { emailRedirectTo: redirectTo },
+      options: { emailRedirectTo: `${siteUrl}/dashboard` },
     })
 
     setLoading(false)
     if (err) {
-      if (err.message.includes('ISO-8859-1') || err.message.includes('fetch')) {
-        setError(
-          'Erreur de connexion au navigateur. Veuillez vider vos cookies pour ce site et reessayer.'
-        )
-      } else {
-        setError(err.message)
-      }
+      setError(err.message)
     } else {
       setSent(true)
     }
