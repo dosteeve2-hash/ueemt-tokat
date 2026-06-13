@@ -4,8 +4,33 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { Menu, X, LayoutDashboard, LogOut, Rss, User, Sun, Moon } from 'lucide-react'
 import { useTheme } from 'next-themes'
+import { useLanguage } from '@/contexts/LanguageContext'
 import { createClient } from '@/lib/supabase/client'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
+
+const LANG_FLAGS: Record<string, string> = { fr: '🇫🇷', en: '🇬🇧', tr: '🇹🇷' }
+
+function LangSelector() {
+  const { lang, setLang } = useLanguage()
+  return (
+    <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-slate-800 rounded-lg px-1 py-1">
+      {(['fr', 'en', 'tr'] as const).map((l) => (
+        <button
+          key={l}
+          onClick={() => setLang(l)}
+          className={`text-xs font-semibold px-2 py-1 rounded-md transition-colors ${
+            lang === l
+              ? 'bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 shadow-sm'
+              : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300'
+          }`}
+          aria-label={`Langue : ${l.toUpperCase()}`}
+        >
+          {LANG_FLAGS[l]} {l.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 interface Profile {
   role: string
@@ -36,6 +61,7 @@ export default function Navbar() {
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [logoUrl, setLogoUrl] = useState('/logo.jpeg')
+  const { t } = useLanguage()
 
   useEffect(() => {
     const supabase = createClient()
@@ -82,11 +108,11 @@ export default function Navbar() {
   }
 
   const links = [
-    { href: '/', label: 'Accueil' },
-    { href: '/a-propos', label: 'À propos' },
-    { href: '/membres', label: 'Membres' },
-    { href: '/activites', label: 'Activités' },
-    { href: '/contact', label: 'Contact' },
+    { href: '/', label: t('nav.home') },
+    { href: '/a-propos', label: t('nav.about') },
+    { href: '/membres', label: t('nav.members') },
+    { href: '/activites', label: t('nav.activities') },
+    { href: '/contact', label: t('nav.contact') },
   ]
 
   const dashboardHref = profile?.role === 'admin' ? '/dashboard/admin' : '/dashboard'
@@ -127,10 +153,11 @@ export default function Navbar() {
                 className="flex items-center gap-1.5 text-gray-700 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-400 font-medium transition-colors text-sm"
               >
                 <Rss size={14} />
-                Fil d&apos;actu
+                {t('nav.feed')}
               </Link>
             )}
 
+            <LangSelector />
             <ThemeToggle />
 
             {user ? (
@@ -167,13 +194,13 @@ export default function Navbar() {
             ) : (
               <>
                 <Link href="/connexion" className="text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:hover:text-slate-200 text-sm">
-                  Connexion
+                  {t('nav.login')}
                 </Link>
                 <Link
                   href="/recensement"
                   className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
                 >
-                  Se Recenser
+                  {t('nav.register')}
                 </Link>
               </>
             )}
@@ -213,27 +240,27 @@ export default function Navbar() {
                     className="flex items-center gap-2 text-gray-700 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-400 hover:bg-gray-50 dark:hover:bg-slate-800 font-medium py-3 px-2 rounded-lg"
                     onClick={() => setOpen(false)}
                   >
-                    <Rss size={16} /> Fil d&apos;actualité
+                    <Rss size={16} /> {t('nav.feed')}
                   </Link>
                   <Link
                     href="/profil"
                     className="flex items-center gap-2 text-gray-700 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-400 hover:bg-gray-50 dark:hover:bg-slate-800 font-medium py-3 px-2 rounded-lg"
                     onClick={() => setOpen(false)}
                   >
-                    <User size={16} /> Mon Profil
+                    <User size={16} /> {t('nav.profile')}
                   </Link>
                   <Link
                     href={dashboardHref}
                     className="flex items-center gap-2 text-gray-700 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-400 hover:bg-gray-50 dark:hover:bg-slate-800 font-medium py-3 px-2 rounded-lg"
                     onClick={() => setOpen(false)}
                   >
-                    <LayoutDashboard size={16} /> Mon Espace
+                    <LayoutDashboard size={16} /> {t('nav.dashboard')}
                   </Link>
                   <button
                     onClick={handleSignOut}
                     className="flex items-center gap-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950 font-medium py-3 px-2 rounded-lg w-full text-left transition-colors"
                   >
-                    <LogOut size={16} /> Déconnexion
+                    <LogOut size={16} /> {t('nav.logout')}
                   </button>
                 </>
               ) : (
@@ -243,17 +270,22 @@ export default function Navbar() {
                     className="block text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 py-3 px-2 rounded-lg"
                     onClick={() => setOpen(false)}
                   >
-                    Connexion
+                    {t('nav.login')}
                   </Link>
                   <Link
                     href="/recensement"
                     className="block bg-green-600 text-white px-4 py-3 rounded-lg text-sm font-semibold text-center mt-2"
                     onClick={() => setOpen(false)}
                   >
-                    Se Recenser
+                    {t('nav.register')}
                   </Link>
                 </>
               )}
+              {/* Language selector in mobile menu */}
+              <div className="mt-4 pt-3 border-t border-gray-100 dark:border-slate-700">
+                <p className="text-xs text-gray-400 dark:text-slate-500 px-2 mb-2 uppercase tracking-wider">Langue / Language / Dil</p>
+                <LangSelector />
+              </div>
             </div>
           </div>
         )}

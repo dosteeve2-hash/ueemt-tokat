@@ -133,4 +133,21 @@ NEXT_PUBLIC_SITE_URL           # https://ueemt-tokat.vercel.app
 
 ---
 
+## Multi-langue (FR / EN / TR)
+
+- Context : `src/contexts/LanguageContext.tsx` — `useLanguage()` hook, persisté en `localStorage`
+- Messages : `src/i18n/messages/{fr,en,tr}.json`
+- Sélecteur dans Navbar (desktop + mobile)
+- Pour traduire un composant : `const { t } = useLanguage()` + `t('section.key')`
+
+## Publication App Store (future)
+
+Pour publier sur App Store sans Mac :
+- Option 1 : Capacitor (capacitorjs.com) — wrap le Next.js en app native, build via Xcode Cloud (cloud, pas besoin de Mac local)
+- Option 2 : EAS Build (Expo) — build iOS dans le cloud
+- Prérequis : compte Apple Developer (99$/an), enregistrement Bundle ID
+- L'app PWA actuelle peut déjà être "installée" depuis Safari sans App Store
+
+---
+
 *Maintenu par Steve Donald Compaoré — dernière mise à jour : 2026-06-13*
