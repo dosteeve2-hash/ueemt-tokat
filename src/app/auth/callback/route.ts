@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
+  const code = searchParams.get('code')
   const token_hash = searchParams.get('token_hash')
   const type = searchParams.get('type') as
     | 'email'
@@ -16,8 +17,18 @@ export async function GET(request: NextRequest) {
     | null
   const next = searchParams.get('next') ?? '/dashboard'
 
+  const supabase = await createClient()
+
+  // PKCE flow (newer Supabase / Admin generateLink)
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    if (!error) {
+      return NextResponse.redirect(new URL(next, origin))
+    }
+  }
+
+  // OTP / token_hash flow (signInWithOtp default)
   if (token_hash && type) {
-    const supabase = await createClient()
     const { error } = await supabase.auth.verifyOtp({ type, token_hash })
     if (!error) {
       return NextResponse.redirect(new URL(next, origin))
