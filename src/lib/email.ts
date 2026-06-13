@@ -1,6 +1,7 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Strip BOM (U+FEFF) that PowerShell/Windows tooling can inject into env vars
+const resend = new Resend((process.env.RESEND_API_KEY ?? '').replace(/^﻿/, ''))
 
 function buildWelcomeHtml(prenom: string, siteUrl: string): string {
   return `<!DOCTYPE html>
