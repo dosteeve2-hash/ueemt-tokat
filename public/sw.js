@@ -1,6 +1,5 @@
-const CACHE_NAME = 'ueemt-v2'
+const CACHE_NAME = 'ueemt-v3'
 const STATIC_ASSETS = [
-  '/',
   '/activites',
   '/membres',
   '/a-propos',
@@ -75,12 +74,15 @@ self.addEventListener('fetch', (e) => {
     return
   }
 
-  // Dynamic pages (feed, profil, dashboard) → network first, no cache fallback
+  // Dynamic pages (homepage + feed + profil + dashboard) → network first, no cache fallback
   if (
+    url.pathname === '/' ||
     url.pathname.startsWith('/feed') ||
     url.pathname.startsWith('/profil') ||
     url.pathname.startsWith('/dashboard') ||
-    url.pathname.startsWith('/recensement')
+    url.pathname.startsWith('/recensement') ||
+    url.pathname.startsWith('/activites') ||
+    url.pathname.startsWith('/membres')
   ) {
     e.respondWith(
       fetch(e.request).catch(() => caches.match('/offline.html'))
