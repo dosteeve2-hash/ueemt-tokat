@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { isBureauMember } from '@/lib/constants'
+import { sendWelcomeEmail } from '@/lib/email'
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,6 +31,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Profil déjà configuré.' }, { status: 409 })
       }
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Send welcome email (non-blocking — failure must not break onboarding)
+    if (user.email) {
+      sendWelcomeEmail(user.email, prenom, nom).catch((e) =>
+        console.error('[onboarding] welcome email failed:', e),
+      )
     }
 
     return NextResponse.json({ ok: true, role })
