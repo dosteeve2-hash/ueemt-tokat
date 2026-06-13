@@ -1,6 +1,5 @@
 'use client'
 
-import type { User } from '@supabase/supabase-js'
 import { Users, CheckCircle, XCircle, Clock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useState } from 'react'
@@ -20,7 +19,6 @@ interface Member {
 
 interface Props {
   members: Member[]
-  user: User
   isAdmin: boolean
 }
 

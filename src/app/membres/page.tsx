@@ -1,25 +1,36 @@
-import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import MembresClient from '@/components/MembresClient'
 
 export default async function MembresPage() {
+  const supabase = await createClient()
+
+  // User is optional — page is public, no redirect
+  let isAdmin = false
   try {
-    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
+    isAdmin = user?.email === 'docompaore2@gmail.com'
+  } catch {}
 
-    if (!user) {
-      redirect('/connexion')
-    }
+  let members: {
+    id: string
+    prenom: string
+    nom: string
+    filiere: string | null
+    niveau: string | null
+    statut: string
+    universite: string | null
+    is_validated: boolean
+    cotisation_payee: boolean
+    photo_url: string | null
+  }[] = []
 
-    const { data: members } = await supabase
+  try {
+    const { data } = await supabase
       .from('members')
       .select('*')
       .order('nom', { ascending: true })
+    members = data ?? []
+  } catch {}
 
-    const isAdmin = user.email === 'docompaore2@gmail.com'
-
-    return <MembresClient members={members ?? []} user={user} isAdmin={isAdmin} />
-  } catch {
-    redirect('/connexion')
-  }
+  return <MembresClient members={members} isAdmin={isAdmin} />
 }
