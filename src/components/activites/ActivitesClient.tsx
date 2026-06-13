@@ -169,7 +169,9 @@ export default function ActivitesClient({ albums, activities }: Props) {
                           <img
                             src={album.cover_url}
                             alt={album.titre}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
