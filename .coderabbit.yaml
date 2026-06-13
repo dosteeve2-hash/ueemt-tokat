@@ -1,0 +1,29 @@
+# .coderabbit.yaml
+language: "fr"
+early_access: false
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  auto_review:
+    enabled: true
+    drafts: false
+  path_instructions:
+    - path: "src/app/api/**"
+      instructions: "Vérifie la validation des inputs, la gestion des erreurs, les fuites de clés API et l'exposition de données sensibles."
+    - path: "src/app/**/actions.ts"
+      instructions: "Vérifie que chaque Server Action valide l'authentification avec getUser() et non getSession()."
+    - path: "src/lib/supabase/**"
+      instructions: "Vérifie que la service_role key n'est jamais utilisée côté client."
+    - path: "**/*.tsx"
+      instructions: "Vérifie les empty states — chaque état vide doit avoir un call to action. Vérifie le support dark mode (classes dark:)."
+  tools:
+    github-checks:
+      enabled: true
+    languagetool:
+      enabled: false
+chat:
+  auto_reply: true

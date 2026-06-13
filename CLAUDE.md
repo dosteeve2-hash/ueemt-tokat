@@ -150,4 +150,22 @@ Pour publier sur App Store sans Mac :
 
 ---
 
-*Maintenu par Steve Donald Compaoré — dernière mise à jour : 2026-06-13*
+## Workflow pré-PR obligatoire
+
+Avant tout PR ou mise en production :
+1. `npm run build` — 0 erreur TypeScript
+2. `npm audit` — corriger toutes les vulnérabilités high/critical
+3. CodeRabbit review — le bot commente automatiquement sur chaque PR GitHub
+   - Pour déclencher manuellement : commenter `@coderabbitai review` sur le PR
+   - Pour un résumé : `@coderabbitai summary`
+   - Pour corriger un problème signalé : `@coderabbitai fix <description>`
+4. Résoudre TOUS les commentaires CodeRabbit marqués "Must Fix" avant merge
+
+## Installation CodeRabbit (une fois)
+1. Aller sur https://app.coderabbit.ai
+2. "Install on GitHub" → sélectionner le repo ueemt-tokat
+3. Gratuit pour les repos publics/open source
+
+---
+
+*Maintenu par Steve Donald Compaoré — dernière mise à jour : 2026-06-14*
