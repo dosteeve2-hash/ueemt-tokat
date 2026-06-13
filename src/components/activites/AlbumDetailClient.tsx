@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, X, ChevronLeft, ChevronRight, Image as ImageIcon } from 'lucide-react'
 
@@ -26,17 +26,17 @@ interface Props {
 
 export default function AlbumDetailClient({ album, photos }: Props) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const touchStartX = useRef<number | null>(null)
 
   const closeLightbox = useCallback(() => setLightboxIndex(null), [])
-
   const goPrev = useCallback(() => {
     setLightboxIndex((i) => (i === null ? null : (i - 1 + photos.length) % photos.length))
   }, [photos.length])
-
   const goNext = useCallback(() => {
     setLightboxIndex((i) => (i === null ? null : (i + 1) % photos.length))
   }, [photos.length])
 
+  // Keyboard navigation
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeLightbox()
@@ -47,25 +47,40 @@ export default function AlbumDetailClient({ album, photos }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [closeLightbox, goPrev, goNext])
 
+  // Scroll lock
   useEffect(() => {
     document.body.style.overflow = lightboxIndex !== null ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [lightboxIndex])
 
+  // Touch swipe in lightbox
+  const onLightboxTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX
+  }
+  const onLightboxTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null) return
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    if (Math.abs(dx) > 40) {
+      if (dx < 0) goNext()
+      else goPrev()
+    }
+    touchStartX.current = null
+  }
+
   return (
     <div className="min-h-screen bg-white">
-      <header className="bg-green-600 text-white py-12">
+      <header className="bg-green-600 text-white py-10 sm:py-12">
         <div className="max-w-7xl mx-auto px-4">
           <Link
             href="/activites"
-            className="inline-flex items-center gap-2 text-green-200 hover:text-white text-sm mb-5 transition-colors"
+            className="inline-flex items-center gap-2 text-green-200 hover:text-white text-sm mb-4 sm:mb-5 transition-colors"
           >
             <ArrowLeft size={16} />
             Retour aux activités
           </Link>
-          <h1 className="text-3xl md:text-4xl font-black">{album.titre}</h1>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-black">{album.titre}</h1>
           {album.description && (
-            <p className="text-green-100 mt-2 max-w-2xl">{album.description}</p>
+            <p className="text-green-100 mt-2 max-w-2xl text-sm sm:text-base">{album.description}</p>
           )}
           <p className="text-green-200 text-sm mt-3">
             {photos.length} photo{photos.length !== 1 ? 's' : ''}
@@ -73,7 +88,7 @@ export default function AlbumDetailClient({ album, photos }: Props) {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-10">
+      <div className="max-w-7xl mx-auto px-4 py-8 sm:py-10">
         {photos.length === 0 ? (
           <div className="text-center py-24 text-gray-400">
             <ImageIcon size={48} className="mx-auto mb-4 text-gray-200" />
@@ -81,7 +96,7 @@ export default function AlbumDetailClient({ album, photos }: Props) {
             <p className="text-sm mt-1">Les membres peuvent en ajouter depuis leur dashboard.</p>
           </div>
         ) : (
-          <div className="columns-2 sm:columns-3 lg:columns-4 gap-3 space-y-3">
+          <div className="columns-2 sm:columns-3 lg:columns-4 gap-2 sm:gap-3 space-y-2 sm:space-y-3">
             {photos.map((photo, index) => (
               <button
                 key={photo.id}
@@ -105,11 +120,15 @@ export default function AlbumDetailClient({ album, photos }: Props) {
         )}
       </div>
 
+      {/* Lightbox */}
       {lightboxIndex !== null && (
         <div
           className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center"
           onClick={closeLightbox}
+          onTouchStart={onLightboxTouchStart}
+          onTouchEnd={onLightboxTouchEnd}
         >
+          {/* Close */}
           <button
             onClick={closeLightbox}
             aria-label="Fermer"
@@ -118,31 +137,34 @@ export default function AlbumDetailClient({ album, photos }: Props) {
             <X size={24} />
           </button>
 
-          <p className="absolute top-4 left-1/2 -translate-x-1/2 text-white/50 text-sm">
+          {/* Counter */}
+          <p className="absolute top-4 left-1/2 -translate-x-1/2 text-white/50 text-sm z-10 select-none">
             {lightboxIndex + 1} / {photos.length}
           </p>
 
+          {/* Prev / Next — hidden on mobile (use swipe) */}
           {photos.length > 1 && (
             <>
               <button
                 aria-label="Photo précédente"
                 onClick={(e) => { e.stopPropagation(); goPrev() }}
-                className="absolute left-3 md:left-6 top-1/2 -translate-y-1/2 text-white/60 hover:text-white p-3 rounded-full hover:bg-white/10 transition-colors z-10"
+                className="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 text-white/60 hover:text-white p-2 sm:p-3 rounded-full hover:bg-white/10 transition-colors z-10 hidden sm:flex"
               >
                 <ChevronLeft size={32} />
               </button>
               <button
                 aria-label="Photo suivante"
                 onClick={(e) => { e.stopPropagation(); goNext() }}
-                className="absolute right-3 md:right-6 top-1/2 -translate-y-1/2 text-white/60 hover:text-white p-3 rounded-full hover:bg-white/10 transition-colors z-10"
+                className="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 text-white/60 hover:text-white p-2 sm:p-3 rounded-full hover:bg-white/10 transition-colors z-10 hidden sm:flex"
               >
                 <ChevronRight size={32} />
               </button>
             </>
           )}
 
+          {/* Photo */}
           <div
-            className="flex flex-col items-center max-w-5xl w-full px-16 max-h-[90vh]"
+            className="flex flex-col items-center w-full px-4 sm:px-16 max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
             <img
@@ -151,11 +173,18 @@ export default function AlbumDetailClient({ album, photos }: Props) {
               className="max-h-[80vh] max-w-full object-contain rounded-lg shadow-2xl"
             />
             {photos[lightboxIndex].caption && (
-              <p className="text-white/60 text-sm mt-3 text-center">
+              <p className="text-white/60 text-sm mt-3 text-center px-4">
                 {photos[lightboxIndex].caption}
               </p>
             )}
           </div>
+
+          {/* Mobile swipe hint */}
+          {photos.length > 1 && (
+            <p className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/30 text-xs sm:hidden select-none">
+              Balayez pour naviguer
+            </p>
+          )}
         </div>
       )}
     </div>

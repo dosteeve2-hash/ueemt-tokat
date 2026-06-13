@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   Users, CheckCircle, XCircle, Clock, Image as ImageIcon,
-  Plus, ChevronDown, ChevronUp, Pencil, Trash2, Upload, X, Check,
+  Plus, ChevronDown, ChevronUp, Pencil, Trash2, Upload, X, Check, Settings,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { uploadPhoto } from '@/lib/supabase/storage'
@@ -58,6 +58,12 @@ function extractStoragePath(url: string): string {
   return idx !== -1 ? url.slice(idx + marker.length) : ''
 }
 
+function extractAvatarPath(url: string): string {
+  const marker = '/object/public/avatars/'
+  const idx = url.indexOf(marker)
+  return idx !== -1 ? url.slice(idx + marker.length) : ''
+}
+
 export default function AdminDashboardClient({
   user,
   profile,
@@ -66,7 +72,7 @@ export default function AdminDashboardClient({
   activities: initActivities,
   stats,
 }: Props) {
-  const [tab, setTab] = useState<'membres' | 'albums' | 'activites'>('membres')
+  const [tab, setTab] = useState<'membres' | 'albums' | 'activites' | 'params'>('membres')
   const [members, setMembers] = useState(initMembers)
   const [albums, setAlbums] = useState(initAlbums)
   const [activities, setActivities] = useState(initActivities)
@@ -76,7 +82,7 @@ export default function AdminDashboardClient({
   const [albumForm, setAlbumForm] = useState({ titre: '', description: '' })
   const [savingAlbum, setSavingAlbum] = useState(false)
 
-  // Album edit (inline)
+  // Album edit
   const [editingAlbumId, setEditingAlbumId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ titre: '', description: '' })
   const [savingEdit, setSavingEdit] = useState(false)
@@ -84,7 +90,7 @@ export default function AdminDashboardClient({
   // Album delete
   const [deletingAlbumId, setDeletingAlbumId] = useState<string | null>(null)
 
-  // Album photos management (expanded)
+  // Album photos
   const [expandedAlbumId, setExpandedAlbumId] = useState<string | null>(null)
   const [albumPhotos, setAlbumPhotos] = useState<Record<string, Photo[]>>({})
   const [loadingPhotos, setLoadingPhotos] = useState<Record<string, boolean>>({})
@@ -99,9 +105,54 @@ export default function AdminDashboardClient({
   const [actForm, setActForm] = useState({ titre: '', description: '', date: '', instagram_url: '' })
   const [savingAct, setSavingAct] = useState(false)
 
+  // Site settings (params tab)
+  const [settingsLoaded, setSettingsLoaded] = useState(false)
+  const [loadingSettings, setLoadingSettings] = useState(false)
+  const [logoUrl, setLogoUrl] = useState('/logo.jpeg')
+  const [heroTitle, setHeroTitle] = useState('UEEMT-TOKAT')
+  const [heroSubtitle, setHeroSubtitle] = useState("Union des Élèves et Étudiants Maliens à Tokat")
+  const [heroTagline, setHeroTagline] = useState('Travail – Solidarité – Réussite')
+  const [heroPhotos, setHeroPhotos] = useState<string[]>([])
+  const [savingSettings, setSavingSettings] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [uploadingHeroPhoto, setUploadingHeroPhoto] = useState(false)
+  const [settingsMsg, setSettingsMsg] = useState('')
+  const logoFileRef = useRef<HTMLInputElement>(null)
+  const heroPhotoFileRef = useRef<HTMLInputElement>(null)
+
   const supabase = createClient()
 
-  // ── Members ──────────────────────────────────────────────────
+  // Load settings when params tab opens
+  useEffect(() => {
+    if (tab !== 'params' || settingsLoaded || loadingSettings) return
+    setLoadingSettings(true)
+    const load = async () => {
+      try {
+        const { data } = await supabase.from('site_settings').select('key, value')
+        if (data) {
+          const map = Object.fromEntries(data.map((r) => [r.key, r.value ?? '']))
+          if (map.logo_url) setLogoUrl(map.logo_url)
+          if (map.hero_title) setHeroTitle(map.hero_title)
+          if (map.hero_subtitle) setHeroSubtitle(map.hero_subtitle)
+          if (map.hero_tagline) setHeroTagline(map.hero_tagline)
+          if (map.hero_photo_urls) {
+            try { setHeroPhotos(JSON.parse(map.hero_photo_urls) as string[]) } catch {}
+          }
+        }
+      } finally {
+        setSettingsLoaded(true)
+        setLoadingSettings(false)
+      }
+    }
+    void load()
+  }, [tab, settingsLoaded, loadingSettings])
+
+  // ── Helpers ────────────────────────────────────────────────────
+  const upsertSetting = async (key: string, value: string) => {
+    await supabase.from('site_settings').upsert({ key, value }, { onConflict: 'key' })
+  }
+
+  // ── Members ───────────────────────────────────────────────────
   const toggleValidation = async (id: string, current: boolean) => {
     await supabase.from('members').update({ is_validated: !current }).eq('id', id)
     setMembers((m) => m.map((x) => (x.id === id ? { ...x, is_validated: !current } : x)))
@@ -141,9 +192,7 @@ export default function AdminDashboardClient({
       .eq('id', albumId)
     setAlbums((prev) =>
       prev.map((a) =>
-        a.id === albumId
-          ? { ...a, titre: editForm.titre, description: editForm.description || null }
-          : a
+        a.id === albumId ? { ...a, titre: editForm.titre, description: editForm.description || null } : a
       )
     )
     setEditingAlbumId(null)
@@ -164,10 +213,7 @@ export default function AdminDashboardClient({
 
   // ── Photos management ─────────────────────────────────────────
   const toggleExpand = async (albumId: string) => {
-    if (expandedAlbumId === albumId) {
-      setExpandedAlbumId(null)
-      return
-    }
+    if (expandedAlbumId === albumId) { setExpandedAlbumId(null); return }
     setExpandedAlbumId(albumId)
     if (!albumPhotos[albumId]) {
       setLoadingPhotos((prev) => ({ ...prev, [albumId]: true }))
@@ -184,7 +230,6 @@ export default function AdminDashboardClient({
   const handleUploadPhotos = async (albumId: string, files: FileList) => {
     setUploadingPhotos((prev) => ({ ...prev, [albumId]: true }))
     const newPhotos: Photo[] = []
-
     for (const file of Array.from(files)) {
       const url = await uploadPhoto(albumId, file)
       if (url) {
@@ -205,11 +250,7 @@ export default function AdminDashboardClient({
         }
       }
     }
-
-    setAlbumPhotos((prev) => ({
-      ...prev,
-      [albumId]: [...(prev[albumId] ?? []), ...newPhotos],
-    }))
+    setAlbumPhotos((prev) => ({ ...prev, [albumId]: [...(prev[albumId] ?? []), ...newPhotos] }))
     setUploadingPhotos((prev) => ({ ...prev, [albumId]: false }))
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
@@ -263,76 +304,145 @@ export default function AdminDashboardClient({
     setSavingAct(false)
   }
 
+  // ── Settings ─────────────────────────────────────────────────
+  const saveHeroText = async () => {
+    setSavingSettings(true)
+    await upsertSetting('hero_title', heroTitle)
+    await upsertSetting('hero_subtitle', heroSubtitle)
+    await upsertSetting('hero_tagline', heroTagline)
+    setSavingSettings(false)
+    setSettingsMsg('Textes hero sauvegardes !')
+    setTimeout(() => setSettingsMsg(''), 2500)
+  }
+
+  const uploadLogo = async (file: File) => {
+    setUploadingLogo(true)
+    const ext = file.name.split('.').pop() ?? 'jpg'
+    const path = `site/logo.${ext}`
+    const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true })
+    if (!error) {
+      const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+      setLogoUrl(data.publicUrl)
+      await upsertSetting('logo_url', data.publicUrl)
+      setSettingsMsg('Logo mis a jour !')
+      setTimeout(() => setSettingsMsg(''), 2500)
+    }
+    setUploadingLogo(false)
+    if (logoFileRef.current) logoFileRef.current.value = ''
+  }
+
+  const uploadHeroPhoto = async (file: File) => {
+    setUploadingHeroPhoto(true)
+    const ext = file.name.split('.').pop() ?? 'jpg'
+    const path = `hero/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+    const { error } = await supabase.storage.from('photos').upload(path, file)
+    if (!error) {
+      const { data } = supabase.storage.from('photos').getPublicUrl(path)
+      const newPhotos = [...heroPhotos, data.publicUrl]
+      setHeroPhotos(newPhotos)
+      await upsertSetting('hero_photo_urls', JSON.stringify(newPhotos))
+    }
+    setUploadingHeroPhoto(false)
+    if (heroPhotoFileRef.current) heroPhotoFileRef.current.value = ''
+  }
+
+  const removeHeroPhoto = async (url: string) => {
+    const newPhotos = heroPhotos.filter((p) => p !== url)
+    setHeroPhotos(newPhotos)
+    await upsertSetting('hero_photo_urls', JSON.stringify(newPhotos))
+    // Also remove from storage if it's a hero/ photo
+    const path = extractStoragePath(url)
+    if (path.startsWith('hero/')) {
+      await supabase.storage.from('photos').remove([path])
+    }
+  }
+
   const statCards = [
     { label: 'Total membres', value: stats.totalMembers, icon: Users, color: 'text-blue-600 bg-blue-50' },
     { label: 'En attente', value: stats.pending, icon: Clock, color: 'text-orange-600 bg-orange-50' },
     { label: 'Cotisation payée', value: stats.cotisationPaid, icon: CheckCircle, color: 'text-green-600 bg-green-50' },
   ]
 
+  const TABS = [
+    { id: 'membres', label: 'Membres' },
+    { id: 'albums', label: 'Albums' },
+    { id: 'activites', label: 'Activités' },
+    { id: 'params', label: 'Paramètres', icon: Settings },
+  ] as const
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-green-700 text-white py-10">
+      <header className="bg-green-700 text-white py-8 sm:py-10">
         <div className="max-w-6xl mx-auto px-4">
           <p className="text-green-300 text-xs uppercase tracking-widest mb-1">Dashboard Admin</p>
-          <h1 className="text-3xl font-black">
+          <h1 className="text-2xl sm:text-3xl font-black">
             {profile.member ? `${profile.member.prenom} ${profile.member.nom}` : 'Bureau Exécutif'}
           </h1>
           <p className="text-green-200 text-sm">{user.email}</p>
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="max-w-6xl mx-auto px-4 py-6 sm:py-8">
+        {/* Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
           {statCards.map(({ label, value, icon: Icon, color }) => (
-            <div key={label} className="bg-white rounded-2xl border border-gray-100 p-5">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${color}`}>
+            <div key={label} className="bg-white rounded-2xl border border-gray-100 p-4 sm:p-5 flex sm:block items-center gap-4">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
                 <Icon size={20} />
               </div>
-              <p className="text-3xl font-black text-gray-900">{value}</p>
-              <p className="text-gray-500 text-sm">{label}</p>
+              <div className="sm:mt-3">
+                <p className="text-2xl sm:text-3xl font-black text-gray-900">{value}</p>
+                <p className="text-gray-500 text-sm">{label}</p>
+              </div>
             </div>
           ))}
         </div>
 
-        <div className="flex gap-1 bg-white rounded-xl border border-gray-100 p-1 mb-6">
-          {(['membres', 'albums', 'activites'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`flex-1 py-2.5 rounded-lg text-sm font-semibold capitalize transition-all ${
-                tab === t ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {t === 'membres' ? 'Membres' : t === 'albums' ? 'Albums Photos' : 'Activités'}
-            </button>
-          ))}
+        {/* Tabs */}
+        <div className="overflow-x-auto mb-6">
+          <div className="flex gap-1 bg-white rounded-xl border border-gray-100 p-1 min-w-max">
+            {TABS.map(({ id, label }) => (
+              <button
+                key={id}
+                onClick={() => setTab(id)}
+                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${
+                  tab === id ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {id === 'params' && <Settings size={14} />}
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* ── MEMBRES ── */}
         {tab === 'membres' && (
           <div className="space-y-3">
             {members.map((m) => (
-              <div key={m.id} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-sm flex-shrink-0">
-                  {m.prenom[0]}{m.nom[0]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-gray-900 text-sm">{m.prenom} {m.nom}</p>
-                  <p className="text-gray-400 text-xs truncate">{m.filiere ?? m.statut}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${m.is_validated ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-600'}`}>
-                    {m.is_validated ? 'Validé' : 'En attente'}
-                  </span>
-                  <button onClick={() => toggleValidation(m.id, m.is_validated)} className="p-1.5 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50">
-                    {m.is_validated ? <XCircle size={15} /> : <CheckCircle size={15} />}
-                  </button>
-                  <button
-                    onClick={() => toggleCotisation(m.id, m.cotisation_payee)}
-                    className={`text-xs px-2 py-1.5 rounded-lg border font-medium ${m.cotisation_payee ? 'border-green-200 text-green-600 bg-green-50' : 'border-red-200 text-red-500'}`}
-                  >
-                    Cotis.
-                  </button>
+              <div key={m.id} className="bg-white rounded-xl border border-gray-100 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-sm flex-shrink-0">
+                    {m.prenom[0]}{m.nom[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-gray-900 text-sm">{m.prenom} {m.nom}</p>
+                    <p className="text-gray-400 text-xs truncate">{m.filiere ?? m.statut}</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${m.is_validated ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-600'}`}>
+                      {m.is_validated ? 'Validé' : 'En attente'}
+                    </span>
+                    <button onClick={() => toggleValidation(m.id, m.is_validated)} className="p-1.5 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 min-h-[36px] min-w-[36px] flex items-center justify-center">
+                      {m.is_validated ? <XCircle size={15} /> : <CheckCircle size={15} />}
+                    </button>
+                    <button
+                      onClick={() => toggleCotisation(m.id, m.cotisation_payee)}
+                      className={`text-xs px-2 py-1.5 rounded-lg border font-medium min-h-[36px] ${m.cotisation_payee ? 'border-green-200 text-green-600 bg-green-50' : 'border-red-200 text-red-500'}`}
+                    >
+                      Cotis.
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -345,7 +455,7 @@ export default function AdminDashboardClient({
             <div className="flex justify-end">
               <button
                 onClick={() => setShowAlbumForm(!showAlbumForm)}
-                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-green-700 transition-colors"
+                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-green-700 transition-colors min-h-[44px]"
               >
                 <Plus size={16} /> Nouvel album
               </button>
@@ -366,10 +476,10 @@ export default function AdminDashboardClient({
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
                 <div className="flex gap-3">
-                  <button onClick={() => setShowAlbumForm(false)} className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-semibold">
+                  <button onClick={() => setShowAlbumForm(false)} className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-semibold min-h-[44px]">
                     Annuler
                   </button>
-                  <button onClick={createAlbum} disabled={savingAlbum} className="flex-1 bg-green-600 text-white py-2.5 rounded-xl text-sm font-bold disabled:opacity-60">
+                  <button onClick={createAlbum} disabled={savingAlbum} className="flex-1 bg-green-600 text-white py-2.5 rounded-xl text-sm font-bold disabled:opacity-60 min-h-[44px]">
                     {savingAlbum ? 'Création...' : 'Créer'}
                   </button>
                 </div>
@@ -385,7 +495,7 @@ export default function AdminDashboardClient({
 
             {albums.map((album) => (
               <div key={album.id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                <div className="p-5">
+                <div className="p-4 sm:p-5">
                   {editingAlbumId === album.id ? (
                     <div className="space-y-3">
                       <input
@@ -400,53 +510,43 @@ export default function AdminDashboardClient({
                         className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                       />
                       <div className="flex gap-2">
-                        <button onClick={() => setEditingAlbumId(null)} className="flex items-center gap-1.5 border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg text-sm">
+                        <button onClick={() => setEditingAlbumId(null)} className="flex items-center gap-1.5 border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg text-sm min-h-[36px]">
                           <X size={14} /> Annuler
                         </button>
-                        <button onClick={() => saveEditAlbum(album.id)} disabled={savingEdit} className="flex items-center gap-1.5 bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold disabled:opacity-60">
+                        <button onClick={() => saveEditAlbum(album.id)} disabled={savingEdit} className="flex items-center gap-1.5 bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold disabled:opacity-60 min-h-[36px]">
                           <Check size={14} /> Enregistrer
                         </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-start gap-4">
+                    <div className="flex items-start gap-3 sm:gap-4">
                       {album.cover_url ? (
-                        <img src={album.cover_url} alt={album.titre} className="w-16 h-16 object-cover rounded-xl flex-shrink-0" />
+                        <img src={album.cover_url} alt={album.titre} className="w-14 h-14 object-cover rounded-xl flex-shrink-0" />
                       ) : (
-                        <div className="w-16 h-16 bg-green-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <div className="w-14 h-14 bg-green-50 rounded-xl flex items-center justify-center flex-shrink-0">
                           <ImageIcon size={24} className="text-green-400" />
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-gray-900">{album.titre}</p>
-                        {album.description && (
-                          <p className="text-gray-500 text-sm mt-0.5">{album.description}</p>
-                        )}
+                        <p className="font-bold text-gray-900 text-sm">{album.titre}</p>
+                        {album.description && <p className="text-gray-500 text-xs mt-0.5">{album.description}</p>}
                         <p className="text-gray-400 text-xs mt-1">
                           {new Date(album.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
                         </p>
                       </div>
-                      <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <button
-                          onClick={() => startEditAlbum(album)}
-                          title="Modifier"
-                          className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                        >
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button onClick={() => startEditAlbum(album)} className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Modifier">
                           <Pencil size={15} />
                         </button>
-                        <button
-                          onClick={() => setDeletingAlbumId(album.id)}
-                          title="Supprimer"
-                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                        >
+                        <button onClick={() => setDeletingAlbumId(album.id)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Supprimer">
                           <Trash2 size={15} />
                         </button>
                         <button
                           onClick={() => toggleExpand(album.id)}
-                          className="flex items-center gap-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+                          className="flex items-center gap-1 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors"
                         >
-                          {expandedAlbumId === album.id ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                          Photos
+                          {expandedAlbumId === album.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          <span className="hidden sm:inline">Photos</span>
                         </button>
                       </div>
                     </div>
@@ -455,14 +555,14 @@ export default function AdminDashboardClient({
                   {deletingAlbumId === album.id && (
                     <div className="mt-4 p-4 bg-red-50 border border-red-100 rounded-xl">
                       <p className="text-sm font-semibold text-red-700 mb-3">
-                        Supprimer l'album « {album.titre} » ? Toutes les photos seront supprimées.
+                        Supprimer « {album.titre} » ? Toutes les photos seront supprimées.
                       </p>
                       <div className="flex gap-2">
-                        <button onClick={() => setDeletingAlbumId(null)} className="flex-1 border border-gray-200 text-gray-600 py-2 rounded-lg text-sm">
+                        <button onClick={() => setDeletingAlbumId(null)} className="flex-1 border border-gray-200 text-gray-600 py-2 rounded-lg text-sm min-h-[44px]">
                           Annuler
                         </button>
-                        <button onClick={() => deleteAlbum(album.id)} className="flex-1 bg-red-500 text-white py-2 rounded-lg text-sm font-bold hover:bg-red-600">
-                          Supprimer définitivement
+                        <button onClick={() => deleteAlbum(album.id)} className="flex-1 bg-red-500 text-white py-2 rounded-lg text-sm font-bold hover:bg-red-600 min-h-[44px]">
+                          Supprimer
                         </button>
                       </div>
                     </div>
@@ -470,26 +570,16 @@ export default function AdminDashboardClient({
                 </div>
 
                 {expandedAlbumId === album.id && (
-                  <div className="border-t border-gray-100 p-5 bg-gray-50">
+                  <div className="border-t border-gray-100 p-4 sm:p-5 bg-gray-50">
                     <div className="flex items-center justify-between mb-4">
                       <p className="text-sm font-semibold text-gray-700">
                         Photos ({(albumPhotos[album.id] ?? []).length})
                       </p>
-                      <label
-                        className={`flex items-center gap-1.5 bg-green-600 text-white px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
-                          uploadingPhotos[album.id] ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:bg-green-700'
-                        }`}
-                      >
+                      <label className={`flex items-center gap-1.5 bg-green-600 text-white px-3 py-2 rounded-xl text-xs font-semibold transition-colors min-h-[36px] ${uploadingPhotos[album.id] ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:bg-green-700'}`}>
                         {uploadingPhotos[album.id] ? (
-                          <>
-                            <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            Upload...
-                          </>
+                          <><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Upload...</>
                         ) : (
-                          <>
-                            <Upload size={13} />
-                            Ajouter photos
-                          </>
+                          <><Upload size={13} />Ajouter</>
                         )}
                         <input
                           ref={fileInputRef}
@@ -506,31 +596,19 @@ export default function AdminDashboardClient({
                     {loadingPhotos[album.id] ? (
                       <p className="text-center text-sm text-gray-400 py-6">Chargement...</p>
                     ) : (albumPhotos[album.id] ?? []).length === 0 ? (
-                      <p className="text-center text-sm text-gray-400 py-6">Aucune photo dans cet album.</p>
+                      <p className="text-center text-sm text-gray-400 py-6">Aucune photo.</p>
                     ) : (
                       <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
                         {(albumPhotos[album.id] ?? []).map((photo) => (
                           <div key={photo.id} className="group relative">
                             <div className="aspect-square overflow-hidden rounded-lg bg-gray-200">
-                              <img
-                                src={photo.url}
-                                alt={photo.caption ?? ''}
-                                className="w-full h-full object-cover"
-                                loading="lazy"
-                              />
+                              <img src={photo.url} alt={photo.caption ?? ''} className="w-full h-full object-cover" loading="lazy" />
                             </div>
                             <div className="absolute inset-0 bg-black/60 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 p-1">
-                              <button
-                                onClick={() => startEditCaption(photo)}
-                                className="flex items-center gap-1 bg-white/20 hover:bg-white/30 text-white px-2 py-1 rounded text-xs backdrop-blur-sm"
-                              >
+                              <button onClick={() => startEditCaption(photo)} className="flex items-center gap-1 bg-white/20 hover:bg-white/30 text-white px-2 py-1 rounded text-xs backdrop-blur-sm">
                                 <Pencil size={11} /> Légende
                               </button>
-                              <button
-                                onClick={() => deletePhoto(photo, album.id)}
-                                disabled={deletingPhotoId === photo.id}
-                                className="flex items-center gap-1 bg-red-500/80 hover:bg-red-600 text-white px-2 py-1 rounded text-xs disabled:opacity-60"
-                              >
+                              <button onClick={() => deletePhoto(photo, album.id)} disabled={deletingPhotoId === photo.id} className="flex items-center gap-1 bg-red-500/80 hover:bg-red-600 text-white px-2 py-1 rounded text-xs disabled:opacity-60">
                                 <Trash2 size={11} />
                                 {deletingPhotoId === photo.id ? '...' : 'Suppr.'}
                               </button>
@@ -545,17 +623,10 @@ export default function AdminDashboardClient({
                                   autoFocus
                                 />
                                 <div className="flex gap-1">
-                                  <button onClick={() => setEditCaptionId(null)} className="flex-1 border border-gray-200 text-gray-500 py-1 rounded text-xs">
-                                    ✕
-                                  </button>
-                                  <button onClick={() => saveCaption(photo.id, album.id)} className="flex-1 bg-green-600 text-white py-1 rounded text-xs font-bold">
-                                    ✓
-                                  </button>
+                                  <button onClick={() => setEditCaptionId(null)} className="flex-1 border border-gray-200 text-gray-500 py-1 rounded text-xs">✕</button>
+                                  <button onClick={() => saveCaption(photo.id, album.id)} className="flex-1 bg-green-600 text-white py-1 rounded text-xs font-bold">✓</button>
                                 </div>
                               </div>
-                            )}
-                            {photo.caption && editCaptionId !== photo.id && (
-                              <p className="text-xs text-gray-500 mt-1 truncate">{photo.caption}</p>
                             )}
                           </div>
                         ))}
@@ -574,7 +645,7 @@ export default function AdminDashboardClient({
             <div className="flex justify-end">
               <button
                 onClick={() => setShowActForm(!showActForm)}
-                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-green-700"
+                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-green-700 min-h-[44px]"
               >
                 <Plus size={16} /> Nouvelle activité
               </button>
@@ -582,36 +653,17 @@ export default function AdminDashboardClient({
 
             {showActForm && (
               <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3">
-                <input
-                  placeholder="Titre *"
-                  value={actForm.titre}
-                  onChange={(e) => setActForm({ ...actForm, titre: e.target.value })}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-                <textarea
-                  placeholder="Description"
-                  value={actForm.description}
-                  onChange={(e) => setActForm({ ...actForm, description: e.target.value })}
-                  rows={3}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
-                />
-                <input
-                  type="date"
-                  value={actForm.date}
-                  onChange={(e) => setActForm({ ...actForm, date: e.target.value })}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-                <input
-                  placeholder="Lien Instagram (optionnel)"
-                  value={actForm.instagram_url}
-                  onChange={(e) => setActForm({ ...actForm, instagram_url: e.target.value })}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
+                <input placeholder="Titre *" value={actForm.titre} onChange={(e) => setActForm({ ...actForm, titre: e.target.value })}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                <textarea placeholder="Description" value={actForm.description} onChange={(e) => setActForm({ ...actForm, description: e.target.value })}
+                  rows={3} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
+                <input type="date" value={actForm.date} onChange={(e) => setActForm({ ...actForm, date: e.target.value })}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                <input placeholder="Lien Instagram (optionnel)" value={actForm.instagram_url} onChange={(e) => setActForm({ ...actForm, instagram_url: e.target.value })}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                 <div className="flex gap-3">
-                  <button onClick={() => setShowActForm(false)} className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-semibold">
-                    Annuler
-                  </button>
-                  <button onClick={createActivity} disabled={savingAct} className="flex-1 bg-green-600 text-white py-2.5 rounded-xl text-sm font-bold disabled:opacity-60">
+                  <button onClick={() => setShowActForm(false)} className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-semibold min-h-[44px]">Annuler</button>
+                  <button onClick={createActivity} disabled={savingAct} className="flex-1 bg-green-600 text-white py-2.5 rounded-xl text-sm font-bold disabled:opacity-60 min-h-[44px]">
                     {savingAct ? 'Création...' : 'Publier'}
                   </button>
                 </div>
@@ -619,9 +671,7 @@ export default function AdminDashboardClient({
             )}
 
             {activities.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center text-gray-400 text-sm">
-                Aucune activité publiée.
-              </div>
+              <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center text-gray-400 text-sm">Aucune activité publiée.</div>
             ) : (
               <div className="space-y-3">
                 {activities.map((a) => (
@@ -640,6 +690,140 @@ export default function AdminDashboardClient({
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        )}
+
+        {/* ── PARAMÈTRES ── */}
+        {tab === 'params' && (
+          <div className="space-y-6">
+            {loadingSettings && (
+              <div className="text-center py-8 text-gray-400 text-sm">Chargement des paramètres...</div>
+            )}
+
+            {settingsMsg && (
+              <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 text-sm font-semibold">
+                {settingsMsg}
+              </div>
+            )}
+
+            {!loadingSettings && (
+              <>
+                {/* Logo */}
+                <div className="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6">
+                  <h3 className="font-bold text-gray-900 mb-4">Logo de l'association</h3>
+                  <div className="flex items-center gap-5 flex-wrap">
+                    <img src={logoUrl} alt="Logo actuel" className="w-16 h-16 rounded-full object-cover border-2 border-gray-100" />
+                    <div>
+                      <label className={`flex items-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer hover:bg-green-700 transition-colors min-h-[44px] ${uploadingLogo ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                        {uploadingLogo ? (
+                          <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Upload...</>
+                        ) : (
+                          <><Upload size={16} />Changer le logo</>
+                        )}
+                        <input
+                          ref={logoFileRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={uploadingLogo}
+                          onChange={(e) => e.target.files?.[0] && uploadLogo(e.target.files[0])}
+                        />
+                      </label>
+                      <p className="text-gray-400 text-xs mt-2">JPEG, PNG — sera visible dans la navbar</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Hero text */}
+                <div className="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6">
+                  <h3 className="font-bold text-gray-900 mb-4">Texte de la page d'accueil</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Titre principal</label>
+                      <input
+                        value={heroTitle}
+                        onChange={(e) => setHeroTitle(e.target.value)}
+                        placeholder="UEEMT-TOKAT"
+                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Sous-titre</label>
+                      <input
+                        value={heroSubtitle}
+                        onChange={(e) => setHeroSubtitle(e.target.value)}
+                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">Slogan</label>
+                      <input
+                        value={heroTagline}
+                        onChange={(e) => setHeroTagline(e.target.value)}
+                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                    </div>
+                    <button
+                      onClick={saveHeroText}
+                      disabled={savingSettings}
+                      className="bg-green-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-green-700 disabled:opacity-60 transition-colors min-h-[44px]"
+                    >
+                      {savingSettings ? 'Sauvegarde...' : 'Sauvegarder les textes'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Hero photos */}
+                <div className="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6">
+                  <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+                    <div>
+                      <h3 className="font-bold text-gray-900">Photos du slideshow (accueil)</h3>
+                      <p className="text-gray-400 text-xs mt-0.5">{heroPhotos.length} photo{heroPhotos.length !== 1 ? 's' : ''} active{heroPhotos.length !== 1 ? 's' : ''}</p>
+                    </div>
+                    <label className={`flex items-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer hover:bg-green-700 transition-colors min-h-[44px] ${uploadingHeroPhoto ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                      {uploadingHeroPhoto ? (
+                        <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Upload...</>
+                      ) : (
+                        <><Upload size={16} />Ajouter une photo</>
+                      )}
+                      <input
+                        ref={heroPhotoFileRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingHeroPhoto}
+                        onChange={(e) => e.target.files?.[0] && uploadHeroPhoto(e.target.files[0])}
+                      />
+                    </label>
+                  </div>
+
+                  {heroPhotos.length === 0 ? (
+                    <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center text-gray-400">
+                      <ImageIcon size={32} className="mx-auto mb-2 text-gray-300" />
+                      <p className="text-sm">Aucune photo. Uploadez-en pour activer le slideshow.</p>
+                      <p className="text-xs mt-1">Sans photo, l'accueil affiche le fond dégradé vert.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {heroPhotos.map((url) => (
+                        <div key={url} className="group relative aspect-video rounded-xl overflow-hidden bg-gray-100">
+                          <img src={url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <button
+                              onClick={() => removeHeroPhoto(url)}
+                              className="bg-red-500 hover:bg-red-600 text-white p-2 rounded-full transition-colors"
+                              title="Retirer du slideshow"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
         )}

@@ -38,7 +38,7 @@ interface Props {
 
 const TABS = [
   { id: 'profil', label: 'Mon Profil', icon: User },
-  { id: 'documents', label: 'Mes Documents', icon: FileText },
+  { id: 'documents', label: 'Documents', icon: FileText },
   { id: 'photos', label: 'Photos', icon: Image },
   { id: 'activites', label: 'Activités', icon: Calendar },
 ]
@@ -49,17 +49,17 @@ export default function DashboardClient({ user, profile, documents, albums }: Pr
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-green-600 text-white py-10">
+      <header className="bg-green-600 text-white py-8 sm:py-10">
         <div className="max-w-5xl mx-auto px-4 flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-green-700 border-2 border-green-300 flex items-center justify-center text-2xl font-bold">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-green-700 border-2 border-green-300 flex items-center justify-center text-xl sm:text-2xl font-bold flex-shrink-0">
             {member ? `${member.prenom[0]}${member.nom[0]}` : '?'}
           </div>
-          <div>
-            <h1 className="text-2xl font-black">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-black truncate">
               {member ? `${member.prenom} ${member.nom}` : 'Mon Espace'}
             </h1>
-            <p className="text-green-200 text-sm">{user.email}</p>
-            <div className="flex items-center gap-3 mt-1">
+            <p className="text-green-200 text-sm truncate">{user.email}</p>
+            <div className="flex items-center gap-2 sm:gap-3 mt-1 flex-wrap">
               <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${member?.is_validated ? 'bg-green-500/30 text-green-100' : 'bg-yellow-500/30 text-yellow-100'}`}>
                 {member?.is_validated ? 'Validé' : 'En attente'}
               </span>
@@ -71,20 +71,23 @@ export default function DashboardClient({ user, profile, documents, albums }: Pr
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-4 py-6">
-        <div className="flex gap-1 bg-white rounded-xl border border-gray-100 p-1 mb-6 overflow-x-auto">
-          {TABS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${
-                activeTab === id ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              <Icon size={16} />
-              {label}
-            </button>
-          ))}
+      <div className="max-w-5xl mx-auto px-4 py-5 sm:py-6">
+        {/* Tabs — scrollable on mobile */}
+        <div className="overflow-x-auto mb-5 sm:mb-6">
+          <div className="flex gap-1 bg-white rounded-xl border border-gray-100 p-1 min-w-max">
+            {TABS.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className={`flex items-center gap-2 px-3 sm:px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-all min-h-[44px] ${
+                  activeTab === id ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <Icon size={16} />
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {activeTab === 'profil' && <ProfileTab user={user} profile={profile} />}
