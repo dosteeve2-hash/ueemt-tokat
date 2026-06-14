@@ -10,7 +10,8 @@
     "dashboard": "My Space",
     "login": "Login",
     "register": "Register",
-    "logout": "Logout"
+    "logout": "Logout",
+    "cotisations": "Fees"
   },
   "home": {
     "stats_members": "Members",

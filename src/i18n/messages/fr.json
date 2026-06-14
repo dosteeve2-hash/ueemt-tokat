@@ -10,7 +10,8 @@
     "dashboard": "Mon Espace",
     "login": "Connexion",
     "register": "Se Recenser",
-    "logout": "Déconnexion"
+    "logout": "Déconnexion",
+    "cotisations": "Cotisations"
   },
   "home": {
     "stats_members": "Membres",

@@ -8,6 +8,8 @@ export type FeedPost = {
   type: string
   content: string | null
   image_url: string | null
+  document_url: string | null
+  document_name: string | null
   is_pinned: boolean
   created_at: string
   author_id: string
@@ -44,7 +46,7 @@ export default async function FeedPage() {
   // Posts
   const { data: postsData } = await supabase
     .from('posts')
-    .select('id, type, content, image_url, is_pinned, created_at, author_id')
+    .select('id, type, content, image_url, document_url, document_name, is_pinned, created_at, author_id')
     .order('is_pinned', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(50)
@@ -111,6 +113,8 @@ export default async function FeedPage() {
     const mem = prof?.member_id ? memberMap[prof.member_id] : null
     return {
       ...p,
+      document_url: p.document_url ?? null,
+      document_name: p.document_name ?? null,
       author_prenom: mem?.prenom ?? 'Membre',
       author_nom: mem?.nom ?? '',
       author_avatar: prof?.avatar_url ?? null,

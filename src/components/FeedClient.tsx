@@ -2,13 +2,33 @@
 
 import { useState, useTransition, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Heart, Trash2, Megaphone, Send, Loader2, MessageCircle, ChevronDown, ChevronUp, ImagePlus, X, Share2, Check } from 'lucide-react'
+import { Heart, Trash2, Megaphone, Send, Loader2, MessageCircle, ChevronDown, ChevronUp, ImagePlus, X, Share2, Check, Paperclip, FileText, FileSpreadsheet, Presentation, File } from 'lucide-react'
 import { createPost, deletePost, toggleLike, addComment, deleteComment, getCommentsWithAuthors } from '@/app/feed/actions'
 import { createClient } from '@/lib/supabase/client'
 import type { FeedPost } from '@/app/feed/page'
 import type { PostCommentData } from '@/app/feed/actions'
 import type { StoryData } from '@/app/feed/stories-actions'
 import StoriesRow from '@/components/StoriesRow'
+
+// TODO: Pour les vidéos volumineuses en production, migrer vers Cloudflare R2 (10 GB gratuit)
+// au lieu de Supabase Storage (1 GB sur free tier). Voir cloudflare.com/developer-platform/r2/
+
+const VIDEO_EXTENSIONS = ['.mp4', '.webm', '.mov']
+const DOC_EXTENSIONS = ['.pdf', '.docx', '.xlsx', '.pptx', '.txt']
+
+function isVideoUrl(url: string): boolean {
+  const lower = url.toLowerCase().split('?')[0]
+  return VIDEO_EXTENSIONS.some(ext => lower.endsWith(ext))
+}
+
+function getDocIcon(name: string) {
+  const ext = name.split('.').pop()?.toLowerCase()
+  if (ext === 'pdf') return <FileText size={20} className="text-red-500" />
+  if (ext === 'xlsx' || ext === 'xls') return <FileSpreadsheet size={20} className="text-green-600" />
+  if (ext === 'pptx' || ext === 'ppt') return <Presentation size={20} className="text-orange-500" />
+  if (ext === 'docx' || ext === 'doc') return <FileText size={20} className="text-blue-600" />
+  return <File size={20} className="text-gray-500" />
+}
 
 interface Props {
   posts: FeedPost[]
@@ -18,6 +38,8 @@ interface Props {
   stories?: StoryData[]
   isAdmin?: boolean
 }
+
+type MediaMode = 'image' | 'video' | 'document' | null
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -326,7 +348,7 @@ function PostCard({
           <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap break-words">{post.content}</p>
         )}
 
-        {post.image_url && (
+        {post.image_url && !isVideoUrl(post.image_url) && (
           <button
             onClick={() => onImageClick(post.image_url!)}
             className="block w-full mt-3 cursor-zoom-in"
@@ -340,6 +362,37 @@ function PostCard({
               className="rounded-xl w-full object-cover max-h-80 hover:opacity-95 transition-opacity"
             />
           </button>
+        )}
+
+        {post.image_url && isVideoUrl(post.image_url) && (
+          <div className="mt-3 rounded-xl overflow-hidden bg-black">
+            <video
+              src={post.image_url}
+              controls
+              muted
+              loop
+              playsInline
+              className="w-full max-h-80 object-contain"
+              preload="metadata"
+            />
+          </div>
+        )}
+
+        {post.document_url && post.document_name && (
+          <a
+            href={post.document_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 flex items-center gap-3 border border-gray-200 rounded-xl px-4 py-3 hover:bg-gray-50 transition-colors group"
+            aria-label={`Ouvrir ${post.document_name}`}
+          >
+            <div className="flex-shrink-0">{getDocIcon(post.document_name)}</div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-800 truncate">{post.document_name}</p>
+              <p className="text-xs text-gray-400">Cliquer pour ouvrir</p>
+            </div>
+            <Paperclip size={14} className="text-gray-300 group-hover:text-gray-500 flex-shrink-0" />
+          </a>
         )}
 
         <div className="mt-3 flex items-center gap-4">
@@ -377,14 +430,18 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
     Object.fromEntries(initialPosts.map(p => [p.id, p.likes_count]))
   )
   const [newContent, setNewContent] = useState('')
-  const [selectedImage, setSelectedImage] = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [selectedMedia, setSelectedMedia] = useState<File | null>(null)
+  const [mediaMode, setMediaMode] = useState<MediaMode>(null)
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null)
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [isPosting, startPostTransition] = useTransition()
   const [, startDeleteTransition] = useTransition()
   const [, startLikeTransition] = useTransition()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const mediaInputRef = useRef<HTMLInputElement>(null)
+  const docInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!lightboxUrl) return
@@ -393,35 +450,78 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
     return () => document.removeEventListener('keydown', handler)
   }, [lightboxUrl])
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    setSelectedImage(file)
-    const reader = new FileReader()
-    reader.onload = () => setImagePreview(reader.result as string)
-    reader.readAsDataURL(file)
+    setUploadError(null)
+
+    if (file.type.startsWith('video/')) {
+      if (file.size > 50 * 1024 * 1024) {
+        setUploadError('Vidéo trop volumineuse (max 50 MB)')
+        e.target.value = ''
+        return
+      }
+      const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+      if (!['mp4', 'webm', 'mov'].includes(ext)) {
+        setUploadError('Format vidéo non supporté (.mp4, .webm, .mov uniquement)')
+        e.target.value = ''
+        return
+      }
+      setSelectedMedia(file)
+      setMediaMode('video')
+      setMediaPreview(URL.createObjectURL(file))
+    } else {
+      setSelectedMedia(file)
+      setMediaMode('image')
+      const reader = new FileReader()
+      reader.onload = () => setMediaPreview(reader.result as string)
+      reader.readAsDataURL(file)
+    }
   }
 
-  const clearImage = () => {
-    setSelectedImage(null)
-    setImagePreview(null)
-    if (fileInputRef.current) fileInputRef.current.value = ''
+  const handleDocSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadError(null)
+
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError('Document trop volumineux (max 10 MB)')
+      e.target.value = ''
+      return
+    }
+    setSelectedMedia(file)
+    setMediaMode('document')
+    setMediaPreview(null)
+  }
+
+  const clearMedia = () => {
+    if (mediaPreview && mediaMode === 'video') URL.revokeObjectURL(mediaPreview)
+    setSelectedMedia(null)
+    setMediaMode(null)
+    setMediaPreview(null)
+    setUploadError(null)
+    setUploadProgress(null)
+    if (mediaInputRef.current) mediaInputRef.current.value = ''
+    if (docInputRef.current) docInputRef.current.value = ''
   }
 
   const myName = `${currentUserName.prenom} ${currentUserName.nom}`.trim() || 'Moi'
-  const canPost = (newContent.trim().length > 0 || !!selectedImage) && !isPosting
+  const canPost = (newContent.trim().length > 0 || !!selectedMedia) && !isPosting
 
   const handlePost = () => {
     if (!canPost) return
     const content = newContent.trim()
-    const fileToUpload = selectedImage
-    const preview = imagePreview
+    const fileToUpload = selectedMedia
+    const mode = mediaMode
+    const preview = mediaPreview
 
     const optimisticPost: FeedPost = {
       id: `temp-${Date.now()}`,
       type: 'post',
       content,
-      image_url: preview,
+      image_url: mode === 'image' ? preview : null,
+      document_url: mode === 'document' ? '#' : null,
+      document_name: mode === 'document' ? fileToUpload?.name ?? null : null,
       is_pinned: false,
       created_at: new Date().toISOString(),
       author_id: currentUserId,
@@ -435,12 +535,15 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
     setPosts(prev => [optimisticPost, ...prev])
     setLikeCounts(prev => ({ ...prev, [optimisticPost.id]: 0 }))
     setNewContent('')
-    clearImage()
+    clearMedia()
 
     startPostTransition(async () => {
       try {
         let imageUrl: string | undefined
-        if (fileToUpload) {
+        let documentUrl: string | undefined
+        let documentName: string | undefined
+
+        if (fileToUpload && mode === 'image') {
           const blob = await resizeImage(fileToUpload)
           const supabase = createClient()
           const path = `posts/${currentUserId}/${Date.now()}.jpg`
@@ -450,8 +553,32 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
           if (!uploadErr) {
             imageUrl = supabase.storage.from('photos').getPublicUrl(path).data.publicUrl
           }
+        } else if (fileToUpload && mode === 'video') {
+          const supabase = createClient()
+          const ext = fileToUpload.name.split('.').pop()?.toLowerCase() ?? 'mp4'
+          const path = `posts/${currentUserId}/${Date.now()}.${ext}`
+          setUploadProgress(0)
+          const { error: uploadErr } = await supabase.storage
+            .from('photos')
+            .upload(path, fileToUpload, { contentType: fileToUpload.type, upsert: false })
+          setUploadProgress(null)
+          if (!uploadErr) {
+            imageUrl = supabase.storage.from('photos').getPublicUrl(path).data.publicUrl
+          }
+        } else if (fileToUpload && mode === 'document') {
+          const supabase = createClient()
+          const safeName = fileToUpload.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+          const path = `${currentUserId}/${Date.now()}_${safeName}`
+          const { error: uploadErr } = await supabase.storage
+            .from('documents')
+            .upload(path, fileToUpload, { contentType: fileToUpload.type, upsert: false })
+          if (!uploadErr) {
+            documentUrl = supabase.storage.from('documents').getPublicUrl(path).data.publicUrl
+            documentName = fileToUpload.name
+          }
         }
-        await createPost(content, imageUrl)
+
+        await createPost(content, imageUrl, documentUrl, documentName)
         router.refresh()
       } catch {
         setPosts(prev => prev.filter(p => p.id !== optimisticPost.id))
@@ -521,15 +648,15 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
               />
 
               {/* Image preview */}
-              {imagePreview && (
+              {mediaPreview && mediaMode === 'image' && (
                 <div className="relative mt-2 inline-block">
                   <img
-                    src={imagePreview}
+                    src={mediaPreview}
                     alt="Aperçu"
                     className="max-h-40 rounded-xl object-cover border border-gray-200"
                   />
                   <button
-                    onClick={clearImage}
+                    onClick={clearMedia}
                     className="absolute -top-2 -right-2 bg-gray-800 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors"
                     aria-label="Supprimer l'image"
                   >
@@ -538,25 +665,95 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
                 </div>
               )}
 
+              {/* Video preview */}
+              {mediaPreview && mediaMode === 'video' && (
+                <div className="relative mt-2 rounded-xl overflow-hidden bg-black border border-gray-200">
+                  <video
+                    src={mediaPreview}
+                    muted
+                    playsInline
+                    controls
+                    className="max-h-40 w-full object-contain"
+                  />
+                  <button
+                    onClick={clearMedia}
+                    className="absolute top-1 right-1 bg-gray-800/80 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors"
+                    aria-label="Supprimer la vidéo"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+
+              {/* Document preview */}
+              {mediaMode === 'document' && selectedMedia && (
+                <div className="mt-2 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+                  <div className="flex-shrink-0">{getDocIcon(selectedMedia.name)}</div>
+                  <span className="text-sm text-gray-700 truncate flex-1">{selectedMedia.name}</span>
+                  <button
+                    onClick={clearMedia}
+                    className="text-gray-400 hover:text-red-500 transition-colors"
+                    aria-label="Supprimer le document"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+
+              {/* Upload progress bar */}
+              {uploadProgress !== null && (
+                <div className="mt-2 w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="bg-green-500 h-full transition-all duration-300 animate-pulse"
+                    style={{ width: '80%' }}
+                  />
+                </div>
+              )}
+
+              {uploadError && (
+                <p className="mt-1 text-xs text-red-500">{uploadError}</p>
+              )}
+
               <div className="flex items-center justify-between mt-2">
-                <div className="flex items-center gap-2">
-                  <p className="text-xs text-gray-400">{newContent.length}/2000 · Ctrl+Entrée pour publier</p>
+                <div className="flex items-center gap-1">
+                  <p className="text-xs text-gray-400 mr-1">{newContent.length}/2000</p>
                   <button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-1 text-xs text-gray-400 hover:text-green-600 transition-colors px-2 py-1 rounded-lg hover:bg-gray-50"
-                    aria-label="Ajouter une photo"
+                    onClick={() => { if (!mediaMode) mediaInputRef.current?.click() }}
+                    disabled={!!mediaMode}
+                    className="flex items-center gap-1 text-xs text-gray-400 hover:text-green-600 transition-colors px-2 py-1 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    aria-label="Ajouter une photo ou vidéo"
+                    title="Photo / Vidéo (max 50 MB)"
                   >
                     <ImagePlus size={15} />
-                    <span>Photo</span>
+                    <span>Média</span>
                   </button>
                   <input
-                    ref={fileInputRef}
+                    ref={mediaInputRef}
                     type="file"
-                    accept="image/*"
-                    onChange={handleImageSelect}
+                    accept="image/*,video/mp4,video/webm,video/quicktime"
+                    onChange={handleMediaSelect}
                     className="hidden"
-                    aria-label="Sélectionner une image"
+                    aria-label="Sélectionner une image ou vidéo"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { if (!mediaMode) docInputRef.current?.click() }}
+                    disabled={!!mediaMode}
+                    className="flex items-center gap-1 text-xs text-gray-400 hover:text-green-600 transition-colors px-2 py-1 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    aria-label="Ajouter un document"
+                    title="Document PDF/DOCX/XLSX (max 10 MB)"
+                  >
+                    <Paperclip size={15} />
+                    <span>Document</span>
+                  </button>
+                  <input
+                    ref={docInputRef}
+                    type="file"
+                    accept=".pdf,.docx,.xlsx,.pptx,.txt"
+                    onChange={handleDocSelect}
+                    className="hidden"
+                    aria-label="Sélectionner un document"
                   />
                 </div>
                 <button

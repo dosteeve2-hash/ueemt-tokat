@@ -10,7 +10,8 @@
     "dashboard": "Alanım",
     "login": "Giriş",
     "register": "Kayıt Ol",
-    "logout": "Çıkış"
+    "logout": "Çıkış",
+    "cotisations": "Aidatlar"
   },
   "home": {
     "stats_members": "Üye",

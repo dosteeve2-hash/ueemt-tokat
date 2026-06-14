@@ -15,18 +15,24 @@ export type PostCommentData = {
   author_avatar: string | null
 }
 
-export async function createPost(content: string, imageUrl?: string) {
+export async function createPost(
+  content: string,
+  imageUrl?: string,
+  documentUrl?: string,
+  documentName?: string,
+) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/connexion')
   const trimmedContent = content.trim()
-  if (!trimmedContent && !imageUrl) throw new Error('Post vide')
+  if (!trimmedContent && !imageUrl && !documentUrl) throw new Error('Post vide')
 
   const { data: newPost, error } = await supabase.from('posts').insert({
     content: trimmedContent.slice(0, 2000),
     author_id: user.id,
     type: 'post',
     ...(imageUrl ? { image_url: imageUrl } : {}),
+    ...(documentUrl ? { document_url: documentUrl, document_name: documentName ?? null } : {}),
   }).select('id, type, is_pinned').single()
   if (error) throw new Error(error.message)
 

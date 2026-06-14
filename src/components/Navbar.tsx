@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { Menu, X, LayoutDashboard, LogOut, Rss, User, Sun, Moon, Search, Bell } from 'lucide-react'
+import { Menu, X, LayoutDashboard, LogOut, Rss, User, Sun, Moon, Search, Bell, Coins } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { createClient } from '@/lib/supabase/client'
@@ -151,13 +151,22 @@ export default function Navbar() {
             ))}
 
             {user && (
-              <Link
-                href="/feed"
-                className="flex items-center gap-1.5 text-gray-700 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-400 font-medium transition-colors text-sm"
-              >
-                <Rss size={14} />
-                {t('nav.feed')}
-              </Link>
+              <>
+                <Link
+                  href="/feed"
+                  className="flex items-center gap-1.5 text-gray-700 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-400 font-medium transition-colors text-sm"
+                >
+                  <Rss size={14} />
+                  {t('nav.feed')}
+                </Link>
+                <Link
+                  href="/cotisations"
+                  className="flex items-center gap-1.5 text-gray-700 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-400 font-medium transition-colors text-sm"
+                >
+                  <Coins size={14} />
+                  {t('nav.cotisations')}
+                </Link>
+              </>
             )}
 
             <button
@@ -260,6 +269,13 @@ export default function Navbar() {
                     onClick={() => setOpen(false)}
                   >
                     <Rss size={16} /> {t('nav.feed')}
+                  </Link>
+                  <Link
+                    href="/cotisations"
+                    className="flex items-center gap-2 text-gray-700 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-400 hover:bg-gray-50 dark:hover:bg-slate-800 font-medium py-3 px-2 rounded-lg"
+                    onClick={() => setOpen(false)}
+                  >
+                    <Coins size={16} /> {t('nav.cotisations')}
                   </Link>
                   <Link
                     href="/notifications"
