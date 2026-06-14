@@ -358,16 +358,33 @@ export async function envoyerLienPremierAcces(
 
   if (linkError || !data?.properties?.action_link) return genericSuccess
 
-  // Send via Resend (best-effort — fall through on any error)
+  // Send via Resend — fall through to Supabase if Resend is in test mode
   if (resendKey) {
     const resend = new Resend(resendKey)
-    await resend.emails.send({
+    const { error: resendError } = await resend.emails.send({
       from: 'UEEMT-Tokat <onboarding@resend.dev>',
       to: [normalizedEmail],
       subject: 'Bienvenue sur UEEMT — Définissez votre mot de passe',
       html: buildPremierAccesEmailHtml(data.properties.action_link),
     })
+
+    // If Resend succeeded, we're done
+    if (!resendError) return genericSuccess
+
+    // If it's NOT a test-mode restriction, log and fall through anyway
+    const isTestRestriction =
+      resendError.message?.includes('testing emails') ||
+      resendError.message?.includes('own email')
+    if (!isTestRestriction) {
+      console.error('[envoyerLienPremierAcces] Resend error:', resendError.message)
+    }
   }
+
+  // Fallback: Supabase sends its default recovery email
+  const supabase = await createSupabaseServerClient()
+  await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+    redirectTo: `${siteUrl}/definir-mot-de-passe`,
+  })
 
   return genericSuccess
 }
