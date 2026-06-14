@@ -48,7 +48,8 @@ RLS activé sur toutes les tables. `WITH CHECK` obligatoire sur INSERT/UPDATE.
 
 ## Auth
 
-Magic link uniquement (pas de mot de passe).
+Email + password via `signInWithPassword`. Magic link réservé comme fallback admin.
+Reset mot de passe : `resetPasswordForEmail` → `/definir-mot-de-passe`.
 Callback : `/auth/callback/route.ts` — gère les deux formats :
 - `?code=` → `exchangeCodeForSession(code)` (PKCE)
 - `?token_hash=&type=` → `verifyOtp(...)` (OTP)
@@ -165,6 +166,36 @@ Avant tout PR ou mise en production :
 1. Aller sur https://app.coderabbit.ai
 2. "Install on GitHub" → sélectionner le repo ueemt-tokat
 3. Gratuit pour les repos publics/open source
+
+---
+
+## Sécurité & Production
+
+### Règles absolues (toujours appliquer)
+- Utiliser `getUser()` jamais `getSession()` dans les Server Actions (getSession fait confiance au client)
+- BOM strip sur tous les env vars : `.replace(/^﻿/, '')`
+- Ne jamais retourner de messages d'erreur techniques au client — `console.error` côté serveur + message générique côté client
+- Vérifier ownership/role côté serveur sur CHAQUE Server Action qui prend un ID en paramètre (IDOR)
+- Rate limiting : par email ou identifiant métier, pas par IP (IP non fiable sur campus/NAT)
+- Honeypot anti-bot : champ caché `aria-hidden` + `tabindex=-1`, styler avec `position:absolute; left:-9999px`
+
+### Checklist déploiement production
+- [ ] Toutes les mutations via Server Actions ('use server') → CSRF natif Next.js
+- [ ] RLS activé sur toutes les tables Supabase
+- [ ] SUPABASE_SERVICE_ROLE_KEY en variable Vercel chiffrée, jamais dans le code
+- [ ] .env.local dans .gitignore
+- [ ] Security headers dans next.config.ts (X-Frame-Options, CSP, nosniff, Referrer-Policy)
+- [ ] Validation backend sur tous les inputs (ne pas faire confiance au frontend seul)
+- [ ] Uploads : rejeter double-extensions (.php.jpg), re-encoder les images via canvas
+- [ ] Approbation admin obligatoire avant accès pour les nouveaux membres
+- [ ] npm audit après chaque ajout de dépendance
+
+### Architecture Supabase + Next.js (ce qui marche bien)
+- Server Components pour les pages protégées → redirect vers /connexion si non authentifié
+- `createServerClient` (server), `createBrowserClient` (client) — ne jamais mélanger
+- Fonctions SECURITY DEFINER `is_admin()` et `get_my_role()` pour les RLS policies
+- Storage : bucket `photos` (images+vidéos, 50MB max), bucket `documents` (PDF/DOCX/etc, 10MB max)
+- Auth email+password avec `signInWithPassword`, reset via `resetPasswordForEmail` → `/definir-mot-de-passe`
 
 ---
 

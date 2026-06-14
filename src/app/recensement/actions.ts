@@ -1,15 +1,14 @@
 'use server'
 
-import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 
-const ipRateLimitMap = new Map<string, { count: number; resetAt: number }>()
+const emailRateLimitMap = new Map<string, { count: number; firstAttempt: number }>()
 
-function checkIpRateLimit(ip: string): boolean {
+function checkEmailRateLimit(email: string): boolean {
   const now = Date.now()
-  const entry = ipRateLimitMap.get(ip)
-  if (!entry || now > entry.resetAt) {
-    ipRateLimitMap.set(ip, { count: 1, resetAt: now + 3_600_000 })
+  const entry = emailRateLimitMap.get(email)
+  if (!entry || now - entry.firstAttempt > 3_600_000) {
+    emailRateLimitMap.set(email, { count: 1, firstAttempt: now })
     return true
   }
   if (entry.count >= 3) return false
@@ -35,16 +34,6 @@ export async function demandeInscription(data: {
   // Honeypot — bots fill hidden fields, humans don't
   if (data.honeypot) return { error: null, success: true }
 
-  // IP rate limiting
-  const headersList = await headers()
-  const ip = (headersList.get('x-forwarded-for') ?? headersList.get('x-real-ip') ?? 'unknown')
-    .split(',')[0]
-    .trim()
-
-  if (!checkIpRateLimit(ip)) {
-    return { error: 'Trop de demandes. Réessaie dans 1 heure.', success: false }
-  }
-
   // Validation
   const prenom = data.prenom?.trim() ?? ''
   const nom = data.nom?.trim() ?? ''
@@ -53,6 +42,11 @@ export async function demandeInscription(data: {
   if (!prenom || prenom.length > 100) return { error: 'Prénom invalide (1–100 caractères).', success: false }
   if (!nom || nom.length > 100) return { error: 'Nom invalide (1–100 caractères).', success: false }
   if (!email || !EMAIL_RE.test(email)) return { error: 'Adresse email invalide.', success: false }
+
+  // Email rate limiting — 3 tentatives max par email sur 1h
+  if (!checkEmailRateLimit(email)) {
+    return { error: 'Trop de tentatives, réessaie dans une heure.', success: false }
+  }
 
   const telephone = (data.telephone ?? '').trim().slice(0, 20) || null
   const dateArrivee = (data.date_arrivee_tokat ?? '').trim() || null
