@@ -1,9 +1,8 @@
-const CACHE_NAME = 'ueemt-v3'
+const CACHE_NAME = 'ueemt-v4'
 const STATIC_ASSETS = [
   '/activites',
   '/membres',
   '/a-propos',
-  '/connexion',
   '/offline.html',
   '/logo.jpeg',
   '/icons/icon-192x192.png',
@@ -74,9 +73,11 @@ self.addEventListener('fetch', (e) => {
     return
   }
 
-  // Dynamic pages (homepage + feed + profil + dashboard) → network first, no cache fallback
+  // Dynamic/auth pages → network first, no cache fallback
   if (
     url.pathname === '/' ||
+    url.pathname.startsWith('/connexion') ||
+    url.pathname.startsWith('/definir-mot-de-passe') ||
     url.pathname.startsWith('/feed') ||
     url.pathname.startsWith('/profil') ||
     url.pathname.startsWith('/dashboard') ||
