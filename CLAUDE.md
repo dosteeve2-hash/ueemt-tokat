@@ -263,4 +263,44 @@ Ne jamais effacer les données affichées pendant un refresh. Pattern dans `Feed
 
 ---
 
+## Performance — Fetches parallèles
+
+**Règle** : si deux fetches Supabase sont indépendants (B n'a pas besoin du résultat de A), ils doivent tourner en parallèle avec `Promise.all()`.
+
+Ne jamais écrire :
+```typescript
+const a = await supabase.from('posts').select()
+const b = await supabase.from('members').select()  // attend inutilement
+```
+
+Écrire plutôt :
+```typescript
+const [{ data: posts }, { data: members }] = await Promise.all([
+  supabase.from('posts').select(),
+  supabase.from('members').select(),
+])
+```
+
+### Fetches qui DOIVENT rester séquentiels
+- `getUser()` → toujours en premier (gate d'auth)
+- Tout fetch qui utilise l'`id` résultant d'un fetch précédent (ex: `profile.member_id` → `members`)
+
+### Pattern en couches (waterfall minimal)
+```
+Layer 1 : getUser()
+Layer 2 : Promise.all([profileCheck, data1, data2, stories, ...])  ← tout ce qui ne dépend que de user.id
+Layer 3 : Promise.all([childData1, childData2, ...])               ← tout ce qui dépend des résultats layer 2
+Layer 4 : données qui dépendent strictement de layer 3
+```
+
+### Implémentations de référence
+| Page | Pattern |
+|---|---|
+| `/feed` | 3 couches : auth → [profile+posts+stories] → [memberName+likes+comments+authorProfiles] → membersData |
+| `/dashboard/admin` | 2 couches : auth+profile (gate admin) → Promise.all([members, albums, activities]) |
+| `/membres` | 2 couches : auth → Promise.all([profileCheck, members, profiles]) |
+| `/cotisations` | 2 couches : auth+profile (pour isGestionnaire) → Promise.all([caisse, maCotisation, historique, allCotisations]) |
+
+---
+
 *Maintenu par Steve Donald Compaoré — dernière mise à jour : 2026-06-14*

@@ -21,20 +21,11 @@ export default async function AdminDashboardPage() {
     const memberData = Array.isArray(rawProfile.member) ? rawProfile.member[0] ?? null : rawProfile.member as { prenom: string; nom: string } | null
     const profile = { role: rawProfile.role as string, member: memberData }
 
-    const { data: members } = await supabase
-      .from('members')
-      .select('*')
-      .order('nom', { ascending: true })
-
-    const { data: albums } = await supabase
-      .from('albums')
-      .select('*, photos(count)')
-      .order('created_at', { ascending: false })
-
-    const { data: activities } = await supabase
-      .from('activities')
-      .select('*')
-      .order('created_at', { ascending: false })
+    const [{ data: members }, { data: albums }, { data: activities }] = await Promise.all([
+      supabase.from('members').select('*').order('nom', { ascending: true }),
+      supabase.from('albums').select('*, photos(count)').order('created_at', { ascending: false }),
+      supabase.from('activities').select('*').order('created_at', { ascending: false }),
+    ])
 
     const totalMembers = members?.length ?? 0
     const pending = members?.filter((m) => !m.is_validated).length ?? 0

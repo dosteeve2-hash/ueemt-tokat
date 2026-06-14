@@ -26,82 +26,66 @@ export default async function FeedPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/connexion')
 
-  // Current user profile for the composer
-  const { data: myProfile } = await supabase
-    .from('user_profiles')
-    .select('id, avatar_url, member_id, role')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  let myMemberName = { prenom: '', nom: '' }
-  if (myProfile?.member_id) {
-    const { data } = await supabase
-      .from('members')
-      .select('prenom, nom')
-      .eq('id', myProfile.member_id)
-      .single()
-    if (data) myMemberName = data
-  }
-
-  // Posts
-  const { data: postsData } = await supabase
-    .from('posts')
-    .select('id, type, content, image_url, document_url, document_name, is_pinned, created_at, author_id')
-    .order('is_pinned', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(50)
+  // Layer 1: myProfile + posts + stories are independent — run in parallel
+  const [{ data: myProfile }, { data: postsData }, stories] = await Promise.all([
+    supabase
+      .from('user_profiles')
+      .select('id, avatar_url, member_id, role')
+      .eq('id', user.id)
+      .maybeSingle(),
+    supabase
+      .from('posts')
+      .select('id, type, content, image_url, document_url, document_name, is_pinned, created_at, author_id')
+      .order('is_pinned', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(50),
+    getActiveStories().catch(() => []),
+  ])
 
   const postIds = (postsData ?? []).map(p => p.id)
+  const authorIds = [...new Set((postsData ?? []).map(p => p.author_id))]
 
-  // Likes
-  let likesData: { post_id: string; user_id: string }[] = []
-  if (postIds.length > 0) {
-    const { data } = await supabase
-      .from('post_likes')
-      .select('post_id, user_id')
-      .in('post_id', postIds)
-    likesData = data ?? []
-  }
+  // Layer 2: all depend on layer 1, but independent of each other — run in parallel
+  const [myMemberResp, likesResp, commentsResp, authorProfilesResp] = await Promise.all([
+    myProfile?.member_id
+      ? supabase.from('members').select('prenom, nom').eq('id', myProfile.member_id).single()
+      : Promise.resolve({ data: null as { prenom: string; nom: string } | null }),
+    postIds.length > 0
+      ? supabase.from('post_likes').select('post_id, user_id').in('post_id', postIds)
+      : Promise.resolve({ data: [] as { post_id: string; user_id: string }[] }),
+    (async () => {
+      if (postIds.length === 0) return { data: [] as { post_id: string }[] }
+      try {
+        return await supabase.from('post_comments').select('post_id').in('post_id', postIds)
+      } catch {
+        return { data: [] as { post_id: string }[] }
+      }
+    })(),
+    authorIds.length > 0
+      ? supabase.from('user_profiles').select('id, avatar_url, member_id').in('id', authorIds)
+      : Promise.resolve({ data: [] as { id: string; avatar_url: string | null; member_id: string | null }[] }),
+  ])
+
+  const myMemberName = myMemberResp.data ?? { prenom: '', nom: '' }
 
   const likesByPost: Record<string, number> = {}
   const userLikedSet = new Set<string>()
-  for (const like of likesData) {
+  for (const like of likesResp.data ?? []) {
     likesByPost[like.post_id] = (likesByPost[like.post_id] ?? 0) + 1
     if (like.user_id === user.id) userLikedSet.add(like.post_id)
   }
 
-  // Comment counts — graceful if table doesn't exist yet
   const commentsByPost: Record<string, number> = {}
-  try {
-    if (postIds.length > 0) {
-      const { data: commentsCountData } = await supabase
-        .from('post_comments')
-        .select('post_id')
-        .in('post_id', postIds)
-      for (const c of commentsCountData ?? []) {
-        commentsByPost[c.post_id] = (commentsByPost[c.post_id] ?? 0) + 1
-      }
-    }
-  } catch { /* post_comments not yet migrated */ }
-
-  // Author info
-  const authorIds = [...new Set((postsData ?? []).map(p => p.author_id))]
-  let profilesData: { id: string; avatar_url: string | null; member_id: string | null }[] = []
-  if (authorIds.length > 0) {
-    const { data } = await supabase
-      .from('user_profiles')
-      .select('id, avatar_url, member_id')
-      .in('id', authorIds)
-    profilesData = data ?? []
+  for (const c of commentsResp.data ?? []) {
+    commentsByPost[c.post_id] = (commentsByPost[c.post_id] ?? 0) + 1
   }
 
+  // Layer 3: membersData for post authors depends on authorProfiles — stays sequential
+  const profilesData = authorProfilesResp.data ?? []
   const memberIds = [...new Set(profilesData.map(p => p.member_id).filter(Boolean))] as string[]
   let membersData: { id: string; prenom: string; nom: string }[] = []
   if (memberIds.length > 0) {
-    const { data } = await supabase
-      .from('members')
-      .select('id, prenom, nom')
-      .in('id', memberIds)
+    const { data } = await supabase.from('members').select('id, prenom, nom').in('id', memberIds)
     membersData = data ?? []
   }
 
@@ -124,7 +108,6 @@ export default async function FeedPage() {
     }
   })
 
-  const stories = await getActiveStories().catch(() => [])
   const isAdmin = myProfile?.role === 'admin'
 
   return (

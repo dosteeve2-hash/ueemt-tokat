@@ -18,21 +18,21 @@ export default async function MembresPage() {
 
   let isAdmin = false
   let currentUserId: string | null = null
-  try {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (user) {
-      currentUserId = user.id
-      const { data } = await supabase.from('user_profiles').select('role').eq('id', user.id).single()
-      isAdmin = data?.role === 'admin'
-    }
-  } catch {}
-
   let membres: MembreCard[] = []
   try {
-    const [{ data: membersData }, { data: profilesData }] = await Promise.all([
+    const { data: { user } } = await supabase.auth.getUser()
+    currentUserId = user?.id ?? null
+
+    // profile check (for isAdmin) + public data are all independent — run in parallel
+    const [profileResp, { data: membersData }, { data: profilesData }] = await Promise.all([
+      user
+        ? supabase.from('user_profiles').select('role').eq('id', user.id).single()
+        : Promise.resolve({ data: null as { role: string } | null }),
       supabase.from('members').select('id, prenom, nom, filiere, statut').eq('is_validated', true).order('nom'),
       supabase.from('user_profiles').select('id, member_id, role, avatar_url, bio').eq('is_public', true).not('member_id', 'is', null),
     ])
+
+    isAdmin = profileResp.data?.role === 'admin'
 
     const profileMap: Record<string, { id: string; role: string | null; avatar_url: string | null; bio: string | null }> = {}
     for (const p of (profilesData ?? [])) {
