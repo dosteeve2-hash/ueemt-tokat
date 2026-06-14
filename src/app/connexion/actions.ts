@@ -82,8 +82,11 @@ export async function sendMagicLink(email: string): Promise<{ error: string | nu
       html: buildLoginEmailHtml(data.properties.action_link),
     })
 
-    if (emailError) return { error: emailError.message }
-    return { error: null }
+    // Resend test-mode restriction: can only send to account owner's email.
+    // Fall through to Supabase signInWithOtp for all other recipients.
+    if (!emailError) return { error: null }
+    const isTestRestriction = emailError.message?.includes('testing emails') || emailError.message?.includes('own email')
+    if (!isTestRestriction) return { error: emailError.message }
   }
 
   // Fallback: Supabase sends its default email
