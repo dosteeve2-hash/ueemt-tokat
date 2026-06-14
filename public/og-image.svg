@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#0F1C3F"/>
+  <rect x="0" y="0" width="1200" height="8" fill="#D4AF37"/>
+  <rect x="0" y="622" width="1200" height="8" fill="#D4AF37"/>
+
+  <!-- Logo circle -->
+  <circle cx="600" cy="230" r="90" fill="none" stroke="#D4AF37" stroke-width="4"/>
+  <circle cx="600" cy="230" r="78" fill="#14A44D"/>
+  <text x="600" y="248" font-family="Arial, sans-serif" font-size="48" font-weight="900" fill="white" text-anchor="middle">U</text>
+
+  <!-- Title -->
+  <text x="600" y="370" font-family="Georgia, serif" font-size="56" font-weight="700" fill="#FFFFFF" text-anchor="middle">UEEMT-Tokat</text>
+
+  <!-- Subtitle -->
+  <text x="600" y="430" font-family="Arial, sans-serif" font-size="24" fill="#D4AF37" text-anchor="middle">Union des Élèves et Étudiants Maliens à Tokat</text>
+
+  <!-- Tagline -->
+  <text x="600" y="490" font-family="Arial, sans-serif" font-size="18" fill="#9BA8C4" text-anchor="middle">Tokat, Turquie · Fondée le 2 novembre 2022</text>
+
+  <!-- Decorative lines -->
+  <line x1="200" y1="340" x2="440" y2="340" stroke="#D4AF37" stroke-width="1" opacity="0.4"/>
+  <line x1="760" y1="340" x2="1000" y2="340" stroke="#D4AF37" stroke-width="1" opacity="0.4"/>
+</svg>

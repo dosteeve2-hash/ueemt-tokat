@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { Menu, X, LayoutDashboard, LogOut, Rss, User, Sun, Moon, Search } from 'lucide-react'
+import { Menu, X, LayoutDashboard, LogOut, Rss, User, Sun, Moon, Search, Bell } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { createClient } from '@/lib/supabase/client'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import SearchOverlay from '@/components/SearchOverlay'
+import NotificationBell from '@/components/NotificationBell'
 
 const LANG_FLAGS: Record<string, string> = { fr: '🇫🇷', en: '🇬🇧', tr: '🇹🇷' }
 
@@ -168,6 +169,7 @@ export default function Navbar() {
             >
               <Search size={18} />
             </button>
+            {user && <NotificationBell />}
             <LangSelector />
             <ThemeToggle />
 
@@ -259,6 +261,13 @@ export default function Navbar() {
                     onClick={() => setOpen(false)}
                   >
                     <Rss size={16} /> {t('nav.feed')}
+                  </Link>
+                  <Link
+                    href="/notifications"
+                    className="flex items-center gap-2 text-gray-700 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-400 hover:bg-gray-50 dark:hover:bg-slate-800 font-medium py-3 px-2 rounded-lg"
+                    onClick={() => setOpen(false)}
+                  >
+                    <Bell size={16} /> Notifications
                   </Link>
                   <Link
                     href="/profil"

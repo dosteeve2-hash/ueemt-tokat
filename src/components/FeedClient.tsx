@@ -7,12 +7,16 @@ import { createPost, deletePost, toggleLike, addComment, deleteComment, getComme
 import { createClient } from '@/lib/supabase/client'
 import type { FeedPost } from '@/app/feed/page'
 import type { PostCommentData } from '@/app/feed/actions'
+import type { StoryData } from '@/app/feed/stories-actions'
+import StoriesRow from '@/components/StoriesRow'
 
 interface Props {
   posts: FeedPost[]
   currentUserId: string
   currentUserAvatar: string | null
   currentUserName: { prenom: string; nom: string }
+  stories?: StoryData[]
+  isAdmin?: boolean
 }
 
 function timeAgo(dateStr: string): string {
@@ -333,7 +337,7 @@ function PostCard({
 }
 
 // ─── FeedClient ──────────────────────────────────────────────────────────────
-export default function FeedClient({ posts: initialPosts, currentUserId, currentUserAvatar, currentUserName }: Props) {
+export default function FeedClient({ posts: initialPosts, currentUserId, currentUserAvatar, currentUserName, stories = [], isAdmin = false }: Props) {
   const router = useRouter()
   const [posts, setPosts] = useState<FeedPost[]>(initialPosts)
   const [likedSet, setLikedSet] = useState<Set<string>>(
@@ -463,6 +467,11 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
       </header>
 
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
+        {/* Stories */}
+        {(stories.length > 0 || isAdmin) && (
+          <StoriesRow stories={stories} isAdmin={isAdmin} currentUserId={currentUserId} />
+        )}
+
         {/* Composer */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
           <div className="flex gap-3">

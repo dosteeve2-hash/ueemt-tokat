@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import FeedClient from '@/components/FeedClient'
+import { getActiveStories } from './stories-actions'
 
 export type FeedPost = {
   id: string
@@ -26,7 +27,7 @@ export default async function FeedPage() {
   // Current user profile for the composer
   const { data: myProfile } = await supabase
     .from('user_profiles')
-    .select('id, avatar_url, member_id')
+    .select('id, avatar_url, member_id, role')
     .eq('id', user.id)
     .maybeSingle()
 
@@ -119,12 +120,17 @@ export default async function FeedPage() {
     }
   })
 
+  const stories = await getActiveStories().catch(() => [])
+  const isAdmin = myProfile?.role === 'admin'
+
   return (
     <FeedClient
       posts={posts}
       currentUserId={user.id}
       currentUserAvatar={myProfile?.avatar_url ?? null}
       currentUserName={myMemberName}
+      stories={stories}
+      isAdmin={isAdmin}
     />
   )
 }

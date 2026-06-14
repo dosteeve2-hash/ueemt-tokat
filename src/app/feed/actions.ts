@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { insertNotification, getAdminUserIds } from '@/app/notifications/actions'
 
 export type PostCommentData = {
   id: string
@@ -21,13 +22,21 @@ export async function createPost(content: string, imageUrl?: string) {
   const trimmedContent = content.trim()
   if (!trimmedContent && !imageUrl) throw new Error('Post vide')
 
-  const { error } = await supabase.from('posts').insert({
+  const { data: newPost, error } = await supabase.from('posts').insert({
     content: trimmedContent.slice(0, 2000),
     author_id: user.id,
     type: 'post',
     ...(imageUrl ? { image_url: imageUrl } : {}),
-  })
+  }).select('id, type, is_pinned').single()
   if (error) throw new Error(error.message)
+
+  // Notify admins if it's a pinned/announcement post
+  if (newPost?.is_pinned) {
+    const adminIds = await getAdminUserIds().catch(() => [])
+    for (const adminId of adminIds) {
+      insertNotification({ userId: adminId, type: 'new_post', actorId: user.id, postId: newPost.id }).catch(() => {})
+    }
+  }
 
   // Fire-and-forget push notification
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://ueemt-tokat.vercel.app'
@@ -71,6 +80,15 @@ export async function toggleLike(postId: string) {
     await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', user.id)
   } else {
     await supabase.from('post_likes').insert({ post_id: postId, user_id: user.id })
+    // Notify post author
+    const { data: post } = await supabase
+      .from('posts')
+      .select('author_id')
+      .eq('id', postId)
+      .single()
+    if (post?.author_id) {
+      insertNotification({ userId: post.author_id, type: 'like', actorId: user.id, postId }).catch(() => {})
+    }
   }
 }
 
@@ -89,6 +107,17 @@ export async function addComment(postId: string, content: string): Promise<strin
     .single()
 
   if (error) throw new Error(error.message)
+
+  // Notify post author
+  const { data: post } = await supabase
+    .from('posts')
+    .select('author_id, content')
+    .eq('id', postId)
+    .single()
+  if (post?.author_id) {
+    insertNotification({ userId: post.author_id, type: 'comment', actorId: user.id, postId }).catch(() => {})
+  }
+
   return data.id
 }
 

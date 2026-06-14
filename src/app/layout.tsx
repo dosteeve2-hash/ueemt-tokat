@@ -17,10 +17,39 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: 'UEEMT-Tokat — Union des Élèves et Étudiants Maliens à Tokat',
-  description: "Site officiel de l'UEEMT-Tokat — Union des Élèves et Étudiants Maliens à Tokat, Turquie. Fondée le 2 novembre 2022.",
-  keywords: 'UEEMT, Maliens, Tokat, Turquie, étudiants, association',
+  metadataBase: new URL('https://ueemt-tokat.vercel.app'),
+  title: {
+    default: 'UEEMT-Tokat — Union des Élèves et Étudiants Maliens à Tokat',
+    template: '%s | UEEMT-Tokat',
+  },
+  description: "Site officiel de l'UEEMT-Tokat — Union des Élèves et Étudiants Maliens à Tokat, Turquie. Réseau, actualités et ressources pour les étudiants maliens. Fondée le 2 novembre 2022.",
+  keywords: ['UEEMT', 'Tokat', 'Mali', 'étudiants maliens', 'association', 'Turquie', 'Gaziosmanpaşa', 'GOP'],
+  authors: [{ name: 'UEEMT-Tokat' }],
+  creator: 'UEEMT-Tokat',
   manifest: '/manifest.json',
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: 'website',
+    locale: 'fr_FR',
+    url: 'https://ueemt-tokat.vercel.app',
+    siteName: 'UEEMT-Tokat',
+    title: 'UEEMT-Tokat — Union des Élèves et Étudiants Maliens à Tokat',
+    description: "Site officiel de l'UEEMT-Tokat — réseau des étudiants maliens à Tokat, Turquie.",
+    images: [
+      {
+        url: '/og-image.svg',
+        width: 1200,
+        height: 630,
+        alt: 'UEEMT-Tokat',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'UEEMT-Tokat',
+    description: "Réseau des étudiants maliens à Tokat, Turquie.",
+    images: ['/og-image.png'],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -49,6 +78,8 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <link rel="apple-touch-icon" href="/icons/icon-180x180.png" />
         <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
+        <link rel="preconnect" href="https://ybjrmvvkasohslgsrhzh.supabase.co" />
+        <link rel="dns-prefetch" href="https://ybjrmvvkasohslgsrhzh.supabase.co" />
       </head>
       <body className={inter.className}>
         <ThemeProvider>

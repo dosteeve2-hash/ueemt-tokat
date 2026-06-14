@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard/
+Disallow: /profil/
+Disallow: /notifications/
+Disallow: /onboarding/
+Disallow: /feed/
+Disallow: /auth/
+
+Sitemap: https://ueemt-tokat.vercel.app/sitemap.xml
