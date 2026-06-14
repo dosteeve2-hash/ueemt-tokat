@@ -446,14 +446,24 @@ export async function getMembresList(): Promise<{
   error: string | null
 }> {
   try {
-    const supabase = await createSupabaseServerClient()
-    const { data, error } = await supabase
+    const serviceKey = stripBom(process.env.SUPABASE_SERVICE_ROLE_KEY)
+    const supabaseUrl = stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL)
+    const hasValidServiceKey = serviceKey.startsWith('eyJ')
+
+    // Utiliser supabaseAdmin pour bypasser le RLS — sinon la liste est vide pour les anonymes
+    const client = hasValidServiceKey
+      ? createAdminClient(supabaseUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+      : await createSupabaseServerClient()
+
+    const { data, error } = await client
       .from('members')
       .select('id, nom_complet, filiere')
-      .eq('is_active', true)
       .order('nom_complet')
 
-    if (error) return { membres: [], error: error.message }
+    if (error) {
+      console.error('[getMembresList]', error)
+      return { membres: [], error: error.message }
+    }
     return { membres: (data ?? []) as Array<{ id: string; nom_complet: string; filiere: string | null }>, error: null }
   } catch (e) {
     return { membres: [], error: String(e) }
