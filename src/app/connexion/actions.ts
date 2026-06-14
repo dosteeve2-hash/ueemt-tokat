@@ -339,13 +339,12 @@ export async function envoyerLienPremierAcces(
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  // Verify member exists and is approved
+  // Verify member exists in the members table (no validation status check —
+  // Steve tells his friends directly when they're approved)
   const { data: member } = await admin
     .from('members')
     .select('id')
     .eq('email', normalizedEmail)
-    .eq('is_validated', true)
-    .eq('is_active', true)
     .maybeSingle()
 
   if (!member) return genericSuccess
