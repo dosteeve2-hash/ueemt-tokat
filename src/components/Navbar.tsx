@@ -77,7 +77,10 @@ export default function Navbar() {
     }
     void fetchLogo()
 
+    let lastFetchedUid: string | null = null
     const fetchProfile = async (uid: string) => {
+      if (uid === lastFetchedUid) return
+      lastFetchedUid = uid
       try {
         const { data } = await supabase
           .from('user_profiles')
@@ -88,15 +91,11 @@ export default function Navbar() {
       } catch {}
     }
 
-    supabase.auth.getUser().then(({ data: { user: u } }) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const u = session?.user ?? null
       setUser(u)
       if (u) fetchProfile(u.id)
-    })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-      if (session?.user) fetchProfile(session.user.id)
-      else setProfile(null)
+      else { lastFetchedUid = null; setProfile(null) }
     })
 
     return () => subscription.unsubscribe()

@@ -42,7 +42,7 @@ function Avatar({ name, avatar, size = 10, colorIdx = 0 }: { name: string; avata
     .toUpperCase()
 
   const cls = `w-${size} h-${size} rounded-full flex-shrink-0`
-  if (avatar) return <img src={avatar} alt={name} className={`${cls} object-cover`} />
+  if (avatar) return <img src={avatar} alt={name} loading="lazy" decoding="async" className={`${cls} object-cover`} />
   return (
     <div className={`${cls} ${AVATAR_COLORS[colorIdx % AVATAR_COLORS.length]} flex items-center justify-center text-white text-xs font-bold`}>
       {initials}
@@ -335,8 +335,9 @@ function PostCard({
             <img
               src={post.image_url}
               alt=""
-              className="rounded-xl w-full object-cover max-h-80 hover:opacity-95 transition-opacity"
               loading="lazy"
+              decoding="async"
+              className="rounded-xl w-full object-cover max-h-80 hover:opacity-95 transition-opacity"
             />
           </button>
         )}
