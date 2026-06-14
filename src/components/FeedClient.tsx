@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useRef, useEffect } from 'react'
+import { useState, useTransition, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Heart, Trash2, Megaphone, Send, Loader2, MessageCircle, ChevronDown, ChevronUp, ImagePlus, X, Share2, Check, Paperclip, FileText, FileSpreadsheet, Presentation, File } from 'lucide-react'
 import { createPost, deletePost, toggleLike, addComment, deleteComment, getCommentsWithAuthors } from '@/app/feed/actions'
@@ -429,6 +429,29 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>(
     Object.fromEntries(initialPosts.map(p => [p.id, p.likes_count]))
   )
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  // Stale-while-revalidate: quand router.refresh() retourne de nouvelles données,
+  // on swap silencieusement sans effacer les anciens posts (les posts temp restent visibles)
+  const syncServerData = useCallback((freshPosts: FeedPost[]) => {
+    setPosts(prev => {
+      const tempPosts = prev.filter(p => p.id.startsWith('temp-'))
+      if (tempPosts.length > 0) {
+        return [...tempPosts, ...freshPosts.filter(p => !tempPosts.some(t => t.id === p.id))]
+      }
+      return freshPosts
+    })
+    setLikeCounts(Object.fromEntries(freshPosts.map(p => [p.id, p.likes_count])))
+  }, [])
+
+  const prevIdsRef = useRef<string>(initialPosts.map(p => p.id).join(','))
+  useEffect(() => {
+    const ids = initialPosts.map(p => p.id).join(',')
+    if (ids === prevIdsRef.current) return
+    prevIdsRef.current = ids
+    syncServerData(initialPosts)
+    setIsRefreshing(false)
+  }, [initialPosts, syncServerData])
   const [newContent, setNewContent] = useState('')
   const [selectedMedia, setSelectedMedia] = useState<File | null>(null)
   const [mediaMode, setMediaMode] = useState<MediaMode>(null)
@@ -593,6 +616,7 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
         }
 
         await createPost(content, imageUrl, documentUrl, documentName)
+        setIsRefreshing(true)
         router.refresh()
       } catch {
         setPosts(prev => prev.filter(p => p.id !== optimisticPost.id))
@@ -630,7 +654,12 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-green-600 text-white py-12">
+      <header className="bg-green-600 text-white py-12 relative overflow-hidden">
+        {isRefreshing && (
+          <div className="absolute inset-x-0 bottom-0 h-0.5 bg-white/20">
+            <div className="h-full bg-white/70 animate-pulse" style={{ width: '60%' }} />
+          </div>
+        )}
         <div className="max-w-2xl mx-auto px-4">
           <p className="text-green-200 text-sm uppercase tracking-widest mb-1">Espace membres</p>
           <h1 className="text-3xl font-black">Fil d&apos;actualité</h1>

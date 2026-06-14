@@ -234,4 +234,33 @@ Avant tout PR ou mise en production :
 
 ---
 
+## Architecture UI résiliente
+
+### Principe
+Chaque section est responsable de ses propres données, loading, et erreurs. Si une section échoue, le reste de la page reste utilisable.
+
+### Fichiers `error.tsx` (error boundaries automatiques Next.js)
+Chaque route principale a son propre `error.tsx` avec message contextuel, emoji, et bouton "Réessayer" qui appelle `reset()`.
+Routes couvertes : `/feed`, `/cotisations`, `/notifications`, `/profil`, `/membres`, `/activites`
+
+### Fichiers `loading.tsx` (Suspense boundaries automatiques Next.js)
+Chaque route a son propre skeleton adapté à la mise en page réelle de la section.
+Ne pas utiliser de spinner global — le skeleton doit refléter la forme du contenu attendu.
+
+### Composant `ErrorBoundary`
+`src/components/ErrorBoundary.tsx` — pour wraper des sections **dans la même page** (pas des routes séparées).
+```tsx
+<ErrorBoundary sectionName="mon-widget">
+  <MonWidget />
+</ErrorBoundary>
+```
+
+### Stale-while-revalidate (FeedClient)
+Ne jamais effacer les données affichées pendant un refresh. Pattern dans `FeedClient.tsx` :
+- Les posts optimistes (`temp-*`) restent visibles pendant le refresh serveur
+- `useEffect` sur `initialPosts` détecte les nouvelles données via comparaison d'IDs
+- `isRefreshing` affiche un indicateur subtil dans le header sans bloquer l'UI
+
+---
+
 *Maintenu par Steve Donald Compaoré — dernière mise à jour : 2026-06-14*
