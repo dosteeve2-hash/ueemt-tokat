@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Bell, Check, Heart, MessageCircle, Megaphone, UserPlus } from 'lucide-react'
+import { Bell, Check, Heart, MessageCircle, Megaphone, UserPlus, Wallet } from 'lucide-react'
 import { markAsRead, markAllAsRead } from '@/app/notifications/actions'
 import type { NotificationData } from '@/app/notifications/actions'
 
@@ -23,6 +23,7 @@ function NotifIcon({ type }: { type: string }) {
   if (type === 'comment') return <MessageCircle size={14} className="text-blue-500" />
   if (type === 'new_post' || type === 'announcement') return <Megaphone size={14} className="text-green-600" />
   if (type === 'new_member') return <UserPlus size={14} className="text-purple-500" />
+  if (type === 'cotisation_rappel') return <Wallet size={14} className="text-amber-500" />
   return <Bell size={14} className="text-gray-400" />
 }
 
@@ -33,6 +34,7 @@ function notifText(notif: NotificationData): string {
   if (notif.type === 'comment') return excerpt ? `a commenté : « ${excerpt}${ellipsis} »` : 'a commenté ton post'
   if (notif.type === 'new_post') return excerpt ? `a publié une annonce : « ${excerpt}${ellipsis} »` : 'a publié une annonce'
   if (notif.type === 'new_member') return 'a rejoint UEEMT-Tokat 🎉'
+  if (notif.type === 'cotisation_rappel') return '💰 Rappel : ta cotisation de ce mois (50 ₺) n\'est pas encore réglée. Contacte le trésorier dès que possible.'
   return 'a fait quelque chose'
 }
 

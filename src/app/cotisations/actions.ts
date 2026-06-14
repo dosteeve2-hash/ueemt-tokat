@@ -60,7 +60,7 @@ export async function getCaisseInfo(): Promise<CaisseInfo> {
     .eq('id', 1)
     .single()
 
-  if (error || !data) return { montant: 0, cotisation_mensuelle: 2000 }
+  if (error || !data) return { montant: 1000, cotisation_mensuelle: 50 }
   return { montant: Number(data.montant), cotisation_mensuelle: Number(data.cotisation_mensuelle) }
 }
 
@@ -260,4 +260,60 @@ export async function updateCotisationMensuelle(montant: number) {
     console.error('[updateCotisationMensuelle]', error.code)
     throw new Error('Impossible de mettre à jour la cotisation mensuelle.')
   }
+}
+
+export async function envoyerRappels(): Promise<{ sent: number }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/connexion')
+
+  await requireTresorierOrAdmin(supabase, user.id)
+
+  const month = currentMonthDate()
+
+  // Tous les membres validés
+  const { data: members } = await supabase
+    .from('members')
+    .select('id')
+    .eq('is_validated', true)
+
+  if (!members?.length) return { sent: 0 }
+
+  const memberIds = members.map(m => m.id)
+
+  // Ceux qui ont déjà payé ce mois
+  const { data: paid } = await supabase
+    .from('cotisation_payments')
+    .select('member_id')
+    .in('member_id', memberIds)
+    .eq('month', month)
+
+  const paidIds = new Set((paid ?? []).map(p => p.member_id))
+  const unpaidMemberIds = memberIds.filter(id => !paidIds.has(id))
+
+  if (!unpaidMemberIds.length) return { sent: 0 }
+
+  // Trouver les user_profiles des membres non payés
+  const { data: profiles } = await supabase
+    .from('user_profiles')
+    .select('id')
+    .in('member_id', unpaidMemberIds)
+
+  if (!profiles?.length) return { sent: 0 }
+
+  // Insérer une notification in-app pour chaque membre non payé
+  const notifInserts = profiles
+    .filter(p => p.id !== user.id) // pas soi-même
+    .map(p => ({
+      user_id: p.id,
+      type: 'cotisation_rappel',
+      actor_id: user.id,
+      post_id: null,
+    }))
+
+  if (notifInserts.length > 0) {
+    await supabase.from('notifications').insert(notifInserts)
+  }
+
+  return { sent: notifInserts.length }
 }

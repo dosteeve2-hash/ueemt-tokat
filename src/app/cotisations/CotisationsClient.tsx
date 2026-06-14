@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { CheckCircle2, Clock, Wallet, Users, ChevronDown, ChevronUp, Loader2, AlertCircle } from 'lucide-react'
+import { CheckCircle2, Clock, Wallet, Users, ChevronDown, ChevronUp, Loader2, AlertCircle, Bell } from 'lucide-react'
 import type {
   CaisseInfo,
   MaCotisation,
@@ -14,6 +14,7 @@ import {
   updateCaisse,
   updateCotisationMensuelle,
   getAllCotisations,
+  envoyerRappels,
 } from './actions'
 
 interface Props {
@@ -29,8 +30,8 @@ function formatMois(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
 }
 
-function formatFCFA(amount: number): string {
-  return new Intl.NumberFormat('fr-FR').format(Math.round(amount)) + ' FCFA'
+function formatTRY(amount: number): string {
+  return new Intl.NumberFormat('tr-TR').format(Math.round(amount)) + ' ₺'
 }
 
 function MonStatutBadge({ paid }: { paid: boolean }) {
@@ -72,6 +73,8 @@ function TableauCotisations({
   const [newCaisse, setNewCaisse] = useState('')
   const [newCotis, setNewCotis] = useState('')
   const [savingConfig, setSavingConfig] = useState(false)
+  const [sendingRappel, setSendingRappel] = useState(false)
+  const [rappelResult, setRappelResult] = useState<string | null>(null)
 
   const reload = () => {
     startTransition(async () => {
@@ -124,6 +127,21 @@ function TableauCotisations({
     }
   }
 
+  const handleEnvoyerRappel = async () => {
+    setSendingRappel(true)
+    setRappelResult(null)
+    try {
+      const { sent } = await envoyerRappels()
+      setRappelResult(sent > 0
+        ? `✅ Rappel envoyé à ${sent} membre${sent > 1 ? 's' : ''} non payé${sent > 1 ? 's' : ''}`
+        : '🎉 Tous les membres ont déjà payé ce mois !')
+    } catch (e) {
+      setRappelResult('❌ ' + (e as Error).message)
+    } finally {
+      setSendingRappel(false)
+    }
+  }
+
   const filtered = rows.filter(r => {
     const matchSearch = `${r.prenom} ${r.nom}`.toLowerCase().includes(search.toLowerCase())
     const matchFilter =
@@ -147,9 +165,24 @@ function TableauCotisations({
           <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">En attente</p>
         </div>
         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 text-center">
-          <p className="text-lg font-black text-blue-600">{formatFCFA(totalRecu)}</p>
+          <p className="text-lg font-black text-blue-600">{formatTRY(totalRecu)}</p>
           <p className="text-xs text-blue-700 dark:text-blue-400 font-medium">Collecté ce mois</p>
         </div>
+      </div>
+
+      {/* Envoyer rappel */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={handleEnvoyerRappel}
+          disabled={sendingRappel}
+          className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
+        >
+          {sendingRappel ? <Loader2 size={14} className="animate-spin" /> : <Bell size={14} />}
+          Envoyer rappel cotisation
+        </button>
+        {rappelResult && (
+          <span className="text-sm text-gray-600 dark:text-slate-300">{rappelResult}</span>
+        )}
       </div>
 
       {/* Config caisse */}
@@ -157,23 +190,23 @@ function TableauCotisations({
         <h3 className="font-bold text-gray-900 dark:text-slate-100 mb-3 text-sm uppercase tracking-wide">Configuration</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="text-xs text-gray-500 dark:text-slate-400 block mb-1">Montant caisse (FCFA)</label>
+            <label className="text-xs text-gray-500 dark:text-slate-400 block mb-1">Montant caisse (₺)</label>
             <input
               type="number"
               value={newCaisse}
               onChange={e => setNewCaisse(e.target.value)}
-              placeholder="Ex: 68000"
+              placeholder="Ex: 1000"
               className="w-full border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
           {isAdmin && (
             <div>
-              <label className="text-xs text-gray-500 dark:text-slate-400 block mb-1">Cotisation mensuelle (FCFA)</label>
+              <label className="text-xs text-gray-500 dark:text-slate-400 block mb-1">Cotisation mensuelle (₺)</label>
               <input
                 type="number"
                 value={newCotis}
                 onChange={e => setNewCotis(e.target.value)}
-                placeholder="Ex: 2000"
+                placeholder="Ex: 50"
                 className="w-full border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-green-500"
               />
             </div>
@@ -242,7 +275,7 @@ function TableauCotisations({
                   {row.paid ? (
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-green-600 dark:text-green-400 font-medium">
-                        {formatFCFA(row.amount!)}
+                        {formatTRY(row.amount!)}
                       </span>
                       <button
                         onClick={() => setExpandedId(expandedId === row.member_id ? null : row.member_id)}
@@ -271,7 +304,7 @@ function TableauCotisations({
                         type="number"
                         value={editAmount}
                         onChange={e => setEditAmount(e.target.value)}
-                        placeholder="Montant reçu (FCFA)"
+                        placeholder="Montant reçu (₺)"
                         className="flex-1 border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-green-500"
                       />
                       <button
@@ -368,10 +401,10 @@ export default function CotisationsClient({
               <div className="w-9 h-9 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center">
                 <Wallet size={18} className="text-green-600 dark:text-green-400" />
               </div>
-              <p className="text-sm text-gray-500 dark:text-slate-400 font-medium">Caisse UEEMT</p>
+              <p className="text-sm text-gray-500 dark:text-slate-400 font-medium">Caisse UEEMT (₺)</p>
             </div>
             <p className="text-2xl font-black text-gray-900 dark:text-slate-100 mt-2">
-              {formatFCFA(caisse.montant)}
+              {formatTRY(caisse.montant)}
             </p>
           </div>
 
@@ -383,7 +416,7 @@ export default function CotisationsClient({
               <p className="text-sm text-gray-500 dark:text-slate-400 font-medium">Cotisation mensuelle</p>
             </div>
             <p className="text-2xl font-black text-gray-900 dark:text-slate-100 mt-2">
-              {formatFCFA(caisse.cotisation_mensuelle)}
+              {formatTRY(caisse.cotisation_mensuelle)}
             </p>
           </div>
         </div>
@@ -397,7 +430,7 @@ export default function CotisationsClient({
             <MonStatutBadge paid={maCotisation.paid} />
             {maCotisation.paid && maCotisation.amount && (
               <span className="text-sm text-gray-500 dark:text-slate-400">
-                {formatFCFA(maCotisation.amount)}
+                {formatTRY(maCotisation.amount)}
                 {maCotisation.paid_at && (
                   <span className="ml-2 text-gray-400 text-xs">
                     le {new Date(maCotisation.paid_at).toLocaleDateString('fr-FR')}
@@ -411,7 +444,7 @@ export default function CotisationsClient({
             <div className="mt-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4">
               <p className="text-sm text-amber-800 dark:text-amber-300">
                 ⚠️ Tu n&apos;as pas encore payé ta cotisation de{' '}
-                <strong>{formatFCFA(caisse.cotisation_mensuelle)}</strong> pour ce mois.
+                <strong>{formatTRY(caisse.cotisation_mensuelle)}</strong> pour ce mois.
                 Contacte le trésorier ou un membre du bureau pour régulariser ta situation.
               </p>
             </div>
@@ -438,7 +471,7 @@ export default function CotisationsClient({
                   </div>
                   <div className="text-right">
                     <span className="text-sm font-semibold text-gray-900 dark:text-slate-100">
-                      {formatFCFA(h.amount)}
+                      {formatTRY(h.amount)}
                     </span>
                     <p className="text-xs text-gray-400">
                       {new Date(h.paid_at).toLocaleDateString('fr-FR')}
