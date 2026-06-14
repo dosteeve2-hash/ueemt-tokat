@@ -3,10 +3,10 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Lock, Mail, Eye, EyeOff, CheckCircle, ArrowLeft } from 'lucide-react'
-import { signInWithPassword, sendPasswordReset } from './actions'
+import { signInWithPassword, sendPasswordReset, envoyerLienPremierAcces } from './actions'
 import { createClient } from '@/lib/supabase/client'
 
-type View = 'login' | 'forgot' | 'forgot-sent'
+type View = 'login' | 'forgot' | 'forgot-sent' | 'premier-acces' | 'premier-acces-sent'
 
 function isValidEmail(val: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)
@@ -27,6 +27,11 @@ function ConnexionContent() {
       ? 'Ce lien est invalide ou a expiré. Connectez-vous avec votre mot de passe.'
       : '',
   )
+
+  // Premier accès state
+  const [premierAccesEmail, setPremierAccesEmail] = useState('')
+  const [premierAccesLoading, setPremierAccesLoading] = useState(false)
+  const [premierAccesError, setPremierAccesError] = useState('')
 
   // Règle 2 — inline validation state
   const [emailTouched, setEmailTouched] = useState(false)
@@ -92,6 +97,25 @@ function ConnexionContent() {
     }
   }
 
+  const handlePremierAcces = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!premierAccesEmail.trim()) return
+    setPremierAccesLoading(true)
+    setPremierAccesError('')
+    try {
+      const { error: err } = await envoyerLienPremierAcces(premierAccesEmail.trim())
+      if (err) {
+        setPremierAccesError(err)
+      } else {
+        setView('premier-acces-sent')
+      }
+    } catch {
+      setPremierAccesError('Une erreur inattendue est survenue. Réessayez.')
+    } finally {
+      setPremierAccesLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 w-full max-w-md">
@@ -99,7 +123,7 @@ function ConnexionContent() {
         {/* Header */}
         <div className="text-center mb-7">
           <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            {view === 'forgot-sent' ? (
+            {(view === 'forgot-sent' || view === 'premier-acces-sent') ? (
               <CheckCircle size={26} className="text-green-600" />
             ) : (
               <Lock size={26} className="text-green-600" />
@@ -109,11 +133,15 @@ function ConnexionContent() {
             {view === 'login' && 'Connexion Membres'}
             {view === 'forgot' && 'Mot de passe oublié'}
             {view === 'forgot-sent' && 'Email envoyé !'}
+            {view === 'premier-acces' && 'Première connexion'}
+            {view === 'premier-acces-sent' && 'Email envoyé !'}
           </h1>
           <p className="text-gray-500 text-sm mt-1.5">
             {view === 'login' && "Espace réservé aux membres de l'UEEMT-Tokat"}
             {view === 'forgot' && 'Entrez votre email pour recevoir un lien de réinitialisation'}
             {view === 'forgot-sent' && `Vérifiez votre boîte mail : ${email}`}
+            {view === 'premier-acces' && 'Reçois un lien pour définir ton mot de passe'}
+            {view === 'premier-acces-sent' && `Vérifiez votre boîte mail : ${premierAccesEmail}`}
           </p>
         </div>
 
@@ -234,12 +262,20 @@ function ConnexionContent() {
               {loading ? 'Connexion...' : 'Se connecter'}
             </button>
 
-            <p className="text-gray-400 text-xs text-center pt-1">
-              Première connexion ?{' '}
-              <span className="text-gray-500">
-                Demandez votre accès à l&apos;admin UEEMT
-              </span>
-            </p>
+            <div className="mt-2 pt-5 border-t border-gray-100 text-center">
+              <p className="text-sm text-gray-500 mb-2">Première connexion sur UEEMT ?</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setPremierAccesEmail(email)
+                  setView('premier-acces')
+                  setError('')
+                }}
+                className="text-sm text-green-700 hover:text-green-800 font-medium underline underline-offset-2"
+              >
+                Envoyer un lien d&apos;activation →
+              </button>
+            </div>
           </form>
         )}
 
@@ -301,6 +337,71 @@ function ConnexionContent() {
             <button
               type="button"
               onClick={() => { setView('login'); setError('') }}
+              className="flex items-center justify-center gap-1.5 text-gray-400 hover:text-gray-600 text-sm w-full py-2 transition-colors"
+            >
+              <ArrowLeft size={14} />
+              Retour à la connexion
+            </button>
+          </div>
+        )}
+
+        {/* ── Premier accès form ── */}
+        {view === 'premier-acces' && (
+          <form onSubmit={handlePremierAcces} className="space-y-4">
+            {premierAccesError && (
+              <div className="text-sm bg-red-50 p-3 rounded-xl">
+                <p className="text-red-600">{premierAccesError}</p>
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Adresse email
+              </label>
+              <div className="relative">
+                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="email"
+                  value={premierAccesEmail}
+                  onChange={(e) => setPremierAccesEmail(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl pl-9 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                  placeholder="votre@email.com"
+                  autoComplete="email"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={premierAccesLoading || !premierAccesEmail.trim()}
+              className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-colors min-h-[48px]"
+            >
+              {premierAccesLoading ? 'Envoi...' : 'Envoyer un lien d\'activation'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setView('login'); setPremierAccesError('') }}
+              className="flex items-center justify-center gap-1.5 text-gray-400 hover:text-gray-600 text-sm w-full py-2 transition-colors"
+            >
+              <ArrowLeft size={14} />
+              Retour à la connexion
+            </button>
+          </form>
+        )}
+
+        {/* ── Premier accès sent confirmation ── */}
+        {view === 'premier-acces-sent' && (
+          <div className="text-center space-y-4">
+            <p className="text-gray-500 text-sm">
+              Si ton adresse est reconnue, tu vas recevoir un email dans quelques minutes.
+            </p>
+            <p className="text-gray-400 text-xs">
+              Vérifie aussi ton dossier spam. Le lien expire dans <strong className="text-gray-600">24h</strong>.
+            </p>
+            <button
+              type="button"
+              onClick={() => { setView('login'); setPremierAccesError('') }}
               className="flex items-center justify-center gap-1.5 text-gray-400 hover:text-gray-600 text-sm w-full py-2 transition-colors"
             >
               <ArrowLeft size={14} />
