@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { sendMagicLink } from '@/app/connexion/actions'
+import { sendPasswordSetupEmail } from '@/app/connexion/actions'
 
 async function requireAdmin() {
   const supabase = await createClient()
@@ -42,7 +42,7 @@ export async function approuverMembre(memberId: string): Promise<{ error: string
 
     // Send access link if member has an email
     if (member.email) {
-      await sendMagicLink(member.email)
+      await sendPasswordSetupEmail(member.email)
     }
 
     return { error: null }

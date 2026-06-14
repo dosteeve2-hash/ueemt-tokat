@@ -118,7 +118,22 @@ function ConnexionContent() {
         </div>
 
         {error && (
-          <p className="text-red-600 text-sm bg-red-50 p-3 rounded-xl mb-4">{error}</p>
+          <div className="text-sm bg-red-50 p-3 rounded-xl mb-4 space-y-1.5">
+            <p className="text-red-600">{error}</p>
+            {view === 'login' && error.includes('incorrect') && (
+              <p className="text-gray-600 text-xs">
+                Si c&apos;est ta première connexion, utilise{' '}
+                <button
+                  type="button"
+                  onClick={() => { setView('forgot'); setError('') }}
+                  className="text-green-600 font-medium hover:underline"
+                >
+                  Mot de passe oublié ?
+                </button>{' '}
+                pour en créer un.
+              </p>
+            )}
+          </div>
         )}
 
         {/* ── Login form ── */}
