@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useTransition, useRef } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { Camera, Save, Eye, EyeOff, ArrowLeft } from 'lucide-react'
+import { Camera, Save, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react'
 import { updateProfile, updateAvatarUrl } from '@/app/profil/actions'
 import { createClient } from '@/lib/supabase/client'
 
@@ -29,6 +29,32 @@ interface Props {
   userId: string
 }
 
+/** Resize an image File to max 400×400 via Canvas, returning a Blob */
+async function resizeImage(file: File, maxPx = 400): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const ratio = Math.min(maxPx / img.width, maxPx / img.height, 1)
+      const w = Math.round(img.width * ratio)
+      const h = Math.round(img.height * ratio)
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { reject(new Error('Canvas not available')); return }
+      ctx.drawImage(img, 0, 0, w, h)
+      canvas.toBlob(blob => {
+        if (blob) resolve(blob)
+        else reject(new Error('Canvas toBlob failed'))
+      }, 'image/jpeg', 0.88)
+    }
+    img.onerror = reject
+    img.src = url
+  })
+}
+
 export default function ProfilClient({ profile, member, userId }: Props) {
   const [bio, setBio] = useState(profile?.bio ?? '')
   const [quote, setQuote] = useState(profile?.quote ?? '')
@@ -37,6 +63,7 @@ export default function ProfilClient({ profile, member, userId }: Props) {
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -44,34 +71,51 @@ export default function ProfilClient({ profile, member, userId }: Props) {
     ? `${member.prenom?.[0] ?? ''}${member.nom?.[0] ?? ''}`.toUpperCase()
     : '?'
 
+  // Auto-hide toast after 3s
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(null), 3000)
+    return () => clearTimeout(t)
+  }, [toast])
+
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 2 * 1024 * 1024) {
-      setUploadError('Taille max : 2 Mo')
+    if (file.size > 8 * 1024 * 1024) {
+      setUploadError('Taille max : 8 Mo')
       return
     }
     setUploadError(null)
     setUploading(true)
 
     try {
+      // Resize to max 400x400 via Canvas
+      const resized = await resizeImage(file, 400)
+
       const supabase = createClient()
-      const ext = file.name.split('.').pop() ?? 'jpg'
-      const path = `${userId}/avatar.${ext}`
+      const path = `${userId}/avatar.jpg`
       const { data, error } = await supabase.storage
         .from('avatars')
-        .upload(path, file, { upsert: true })
+        .upload(path, resized, { contentType: 'image/jpeg', upsert: true })
 
       if (error) {
-        setUploadError('Upload échoué. Crée le bucket "avatars" dans Supabase Dashboard (public).')
+        setUploadError('Upload échoué. Vérifiez que le bucket "avatars" existe dans Supabase.')
         return
       }
 
       const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(data.path)
-      setAvatarUrl(publicUrl)
-      startTransition(async () => { await updateAvatarUrl(publicUrl) })
+      // Force cache bust
+      const freshUrl = `${publicUrl}?t=${Date.now()}`
+      setAvatarUrl(freshUrl)
+      startTransition(async () => {
+        await updateAvatarUrl(publicUrl)
+      })
+      setToast('Photo de profil mise à jour !')
+    } catch {
+      setUploadError('Erreur lors du redimensionnement de l\'image.')
     } finally {
       setUploading(false)
+      e.target.value = ''
     }
   }
 
@@ -97,7 +141,8 @@ export default function ProfilClient({ profile, member, userId }: Props) {
         {/* Avatar */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-5 shadow-sm">
           <div className="flex items-center gap-5">
-            <div className="relative flex-shrink-0">
+            {/* Avatar with hover overlay */}
+            <div className="relative flex-shrink-0 group cursor-pointer" onClick={() => !uploading && fileRef.current?.click()}>
               {avatarUrl ? (
                 <img
                   src={avatarUrl}
@@ -109,16 +154,24 @@ export default function ProfilClient({ profile, member, userId }: Props) {
                   {initials}
                 </div>
               )}
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                disabled={uploading}
-                className="absolute bottom-0 right-0 bg-green-600 text-white rounded-full p-1.5 hover:bg-green-700 transition-colors shadow-sm disabled:opacity-50"
-                aria-label="Changer la photo"
-              >
-                <Camera size={14} />
-              </button>
+              {/* Hover overlay */}
+              <div className={`absolute inset-0 rounded-full bg-black/50 flex flex-col items-center justify-center transition-opacity duration-200 ${
+                uploading ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+              }`}>
+                {uploading ? (
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span className="text-white text-xs font-medium">Upload…</span>
+                  </div>
+                ) : (
+                  <>
+                    <Camera size={18} className="text-white mb-0.5" />
+                    <span className="text-white text-xs font-medium">Changer</span>
+                  </>
+                )}
+              </div>
             </div>
+
             <div>
               <p className="font-bold text-gray-900 text-lg">
                 {member ? `${member.prenom} ${member.nom}` : 'Profil'}
@@ -133,9 +186,10 @@ export default function ProfilClient({ profile, member, userId }: Props) {
               {member?.filiere && (
                 <p className="text-sm text-gray-400 mt-0.5">{member.filiere}</p>
               )}
-              {uploading && <p className="text-xs text-green-600 mt-1">Upload en cours…</p>}
+              <p className="text-xs text-gray-400 mt-1">Cliquer sur la photo pour la changer</p>
             </div>
           </div>
+
           <input
             ref={fileRef}
             type="file"
@@ -225,6 +279,14 @@ export default function ProfilClient({ profile, member, userId }: Props) {
           </p>
         )}
       </div>
+
+      {/* Toast notification */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-gray-900 text-white px-5 py-3 rounded-full shadow-lg text-sm font-medium animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <CheckCircle size={16} className="text-green-400" />
+          {toast}
+        </div>
+      )}
     </div>
   )
 }

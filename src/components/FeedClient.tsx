@@ -2,9 +2,10 @@
 
 import { useState, useTransition, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { Heart, Trash2, Megaphone, Send, Loader2 } from 'lucide-react'
-import { createPost, deletePost, toggleLike } from '@/app/feed/actions'
+import { Heart, Trash2, Megaphone, Send, Loader2, MessageCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { createPost, deletePost, toggleLike, addComment, deleteComment, getCommentsWithAuthors } from '@/app/feed/actions'
 import type { FeedPost } from '@/app/feed/page'
+import type { PostCommentData } from '@/app/feed/actions'
 
 interface Props {
   posts: FeedPost[]
@@ -44,6 +45,264 @@ function Avatar({ name, avatar, size = 10, colorIdx = 0 }: { name: string; avata
   )
 }
 
+// ─── Comment Section (lazy-loaded) ──────────────────────────────────────────
+function CommentSection({
+  postId,
+  initialCount,
+  currentUserId,
+  currentUserAvatar,
+  currentUserName,
+  colorIdx,
+}: {
+  postId: string
+  initialCount: number
+  currentUserId: string
+  currentUserAvatar: string | null
+  currentUserName: { prenom: string; nom: string }
+  colorIdx: number
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [comments, setComments] = useState<PostCommentData[]>([])
+  const [loading, setLoading] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const [count, setCount] = useState(initialCount)
+  const [newComment, setNewComment] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const myName = `${currentUserName.prenom} ${currentUserName.nom}`.trim() || 'Moi'
+
+  const loadComments = async () => {
+    if (loaded) return
+    setLoading(true)
+    try {
+      const data = await getCommentsWithAuthors(postId)
+      setComments(data)
+      setLoaded(true)
+    } catch {
+      setLoaded(true)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleToggle = () => {
+    if (!expanded) loadComments()
+    setExpanded(e => !e)
+  }
+
+  const handleSubmit = async () => {
+    if (!newComment.trim() || submitting) return
+    const content = newComment.trim()
+    const optimisticId = `tmp-${Date.now()}`
+    const optimistic: PostCommentData = {
+      id: optimisticId,
+      post_id: postId,
+      author_id: currentUserId,
+      content,
+      created_at: new Date().toISOString(),
+      author_prenom: currentUserName.prenom,
+      author_nom: currentUserName.nom,
+      author_avatar: currentUserAvatar,
+    }
+    setComments(prev => [...prev, optimistic])
+    setCount(c => c + 1)
+    setNewComment('')
+    setSubmitting(true)
+    try {
+      const realId = await addComment(postId, content)
+      setComments(prev => prev.map(c => c.id === optimisticId ? { ...c, id: realId } : c))
+    } catch {
+      setComments(prev => prev.filter(c => c.id !== optimisticId))
+      setCount(c => Math.max(0, c - 1))
+      setNewComment(content)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDelete = async (commentId: string) => {
+    setComments(prev => prev.filter(c => c.id !== commentId))
+    setCount(c => Math.max(0, c - 1))
+    try {
+      await deleteComment(commentId)
+    } catch {
+      loadComments()
+    }
+  }
+
+  return (
+    <div className="border-t border-gray-50 mt-3 pt-3">
+      {/* Toggle button */}
+      <button
+        onClick={handleToggle}
+        className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-green-600 transition-colors"
+      >
+        <MessageCircle size={15} />
+        <span className="text-xs font-medium">
+          {count > 0 ? `${count} commentaire${count > 1 ? 's' : ''}` : 'Commenter'}
+        </span>
+        {count > 0 && (expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />)}
+      </button>
+
+      {expanded && (
+        <div className="mt-3 space-y-3">
+          {loading && (
+            <div className="flex justify-center py-2">
+              <Loader2 size={16} className="animate-spin text-gray-400" />
+            </div>
+          )}
+
+          {!loading && loaded && comments.length === 0 && (
+            <p className="text-xs text-gray-400 text-center py-2">
+              💬 Sois le premier à commenter !
+            </p>
+          )}
+
+          {comments.map((comment, ci) => {
+            const name = `${comment.author_prenom} ${comment.author_nom}`.trim() || 'Membre'
+            const isOwn = comment.author_id === currentUserId
+            return (
+              <div key={comment.id} className="flex gap-2.5 group/comment">
+                <Avatar name={name} avatar={comment.author_avatar} size={7} colorIdx={(colorIdx + ci) % 5} />
+                <div className="flex-1 min-w-0">
+                  <div className="bg-gray-50 rounded-xl px-3 py-2">
+                    <p className="text-xs font-semibold text-gray-800">{name}</p>
+                    <p className="text-sm text-gray-700 leading-snug break-words">{comment.content}</p>
+                  </div>
+                  <div className="flex items-center gap-3 mt-0.5 px-1">
+                    <span className="text-xs text-gray-400">{timeAgo(comment.created_at)}</span>
+                    {isOwn && (
+                      <button
+                        onClick={() => handleDelete(comment.id)}
+                        className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover/comment:opacity-100"
+                        aria-label="Supprimer"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+
+          {/* Comment input */}
+          <div className="flex gap-2.5 pt-1">
+            <Avatar name={myName} avatar={currentUserAvatar} size={7} colorIdx={colorIdx} />
+            <div className="flex-1 flex items-end gap-2">
+              <textarea
+                value={newComment}
+                onChange={e => setNewComment(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSubmit()
+                  }
+                }}
+                placeholder="Ajouter un commentaire…"
+                rows={1}
+                maxLength={500}
+                style={{ minHeight: '36px', maxHeight: '96px' }}
+                className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
+              />
+              <button
+                onClick={handleSubmit}
+                disabled={!newComment.trim() || submitting}
+                className="flex-shrink-0 bg-green-600 hover:bg-green-700 text-white p-2 rounded-xl transition-colors disabled:opacity-40"
+                aria-label="Envoyer"
+              >
+                {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── PostCard ────────────────────────────────────────────────────────────────
+function PostCard({
+  post,
+  liked,
+  likeCount,
+  isOwn,
+  colorIdx,
+  onLike,
+  onDelete,
+  pinned,
+  currentUserId,
+  currentUserAvatar,
+  currentUserName,
+}: {
+  post: FeedPost
+  liked: boolean
+  likeCount: number
+  isOwn: boolean
+  colorIdx: number
+  onLike: () => void
+  onDelete: () => void
+  pinned: boolean
+  currentUserId: string
+  currentUserAvatar: string | null
+  currentUserName: { prenom: string; nom: string }
+}) {
+  const authorName = `${post.author_prenom} ${post.author_nom}`.trim() || 'Membre'
+
+  return (
+    <div className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${pinned ? 'border-green-200' : 'border-gray-100'}`}>
+      {pinned && (
+        <div className="bg-green-600 text-white text-xs font-semibold px-4 py-1.5 flex items-center gap-1.5">
+          <Megaphone size={12} /> Annonce du bureau
+        </div>
+      )}
+
+      <div className="p-4">
+        <div className="flex items-start gap-3 mb-3">
+          <Avatar name={authorName} avatar={post.author_avatar} size={9} colorIdx={colorIdx} />
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-gray-900 text-sm leading-tight">{authorName}</p>
+            <p className="text-xs text-gray-400">{timeAgo(post.created_at)}</p>
+          </div>
+          {isOwn && (
+            <button onClick={onDelete} className="text-gray-300 hover:text-red-500 transition-colors p-1" aria-label="Supprimer">
+              <Trash2 size={15} />
+            </button>
+          )}
+        </div>
+
+        {post.content && (
+          <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap break-words">{post.content}</p>
+        )}
+
+        {post.image_url && (
+          <img src={post.image_url} alt="" className="mt-3 rounded-xl w-full object-cover max-h-80" loading="lazy" />
+        )}
+
+        <div className="mt-3 flex items-center gap-4">
+          <button
+            onClick={onLike}
+            className={`flex items-center gap-1.5 text-sm transition-colors ${liked ? 'text-red-500' : 'text-gray-400 hover:text-red-400'}`}
+          >
+            <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
+            <span className="text-xs font-medium">{likeCount > 0 ? likeCount : ''}</span>
+          </button>
+        </div>
+
+        <CommentSection
+          postId={post.id}
+          initialCount={post.comments_count}
+          currentUserId={currentUserId}
+          currentUserAvatar={currentUserAvatar}
+          currentUserName={currentUserName}
+          colorIdx={colorIdx}
+        />
+      </div>
+    </div>
+  )
+}
+
+// ─── FeedClient ──────────────────────────────────────────────────────────────
 export default function FeedClient({ posts: initialPosts, currentUserId, currentUserAvatar, currentUserName }: Props) {
   const router = useRouter()
   const [posts, setPosts] = useState<FeedPost[]>(initialPosts)
@@ -77,6 +336,7 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
       author_avatar: currentUserAvatar,
       likes_count: 0,
       user_liked: false,
+      comments_count: 0,
     }
     setPosts(prev => [optimisticPost, ...prev])
     setLikeCounts(prev => ({ ...prev, [optimisticPost.id]: 0 }))
@@ -162,7 +422,7 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
           </div>
         </div>
 
-        {/* Pinned announcements */}
+        {/* Pinned posts */}
         {pinnedPosts.map((post, i) => (
           <PostCard
             key={post.id}
@@ -174,10 +434,13 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
             onLike={() => handleLike(post.id)}
             onDelete={() => handleDelete(post.id)}
             pinned
+            currentUserId={currentUserId}
+            currentUserAvatar={currentUserAvatar}
+            currentUserName={currentUserName}
           />
         ))}
 
-        {/* Empty state with CTA */}
+        {/* Empty state */}
         {regularPosts.length === 0 && pinnedPosts.length === 0 && (
           <div className="bg-white rounded-2xl border border-gray-100 py-16 px-6 text-center shadow-sm">
             <div className="text-5xl mb-4">📸</div>
@@ -205,88 +468,11 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
             onLike={() => handleLike(post.id)}
             onDelete={() => handleDelete(post.id)}
             pinned={false}
+            currentUserId={currentUserId}
+            currentUserAvatar={currentUserAvatar}
+            currentUserName={currentUserName}
           />
         ))}
-      </div>
-    </div>
-  )
-}
-
-function PostCard({
-  post,
-  liked,
-  likeCount,
-  isOwn,
-  colorIdx,
-  onLike,
-  onDelete,
-  pinned,
-}: {
-  post: FeedPost
-  liked: boolean
-  likeCount: number
-  isOwn: boolean
-  colorIdx: number
-  onLike: () => void
-  onDelete: () => void
-  pinned: boolean
-}) {
-  const authorName = `${post.author_prenom} ${post.author_nom}`.trim() || 'Membre'
-
-  return (
-    <div className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${
-      pinned ? 'border-green-200' : 'border-gray-100'
-    }`}>
-      {pinned && (
-        <div className="bg-green-600 text-white text-xs font-semibold px-4 py-1.5 flex items-center gap-1.5">
-          <Megaphone size={12} /> Annonce du bureau
-        </div>
-      )}
-
-      <div className="p-4">
-        <div className="flex items-start gap-3 mb-3">
-          <Avatar name={authorName} avatar={post.author_avatar} size={9} colorIdx={colorIdx} />
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-gray-900 text-sm leading-tight">{authorName}</p>
-            <p className="text-xs text-gray-400">{timeAgo(post.created_at)}</p>
-          </div>
-          {isOwn && (
-            <button
-              onClick={onDelete}
-              className="text-gray-300 hover:text-red-500 transition-colors p-1"
-              aria-label="Supprimer"
-            >
-              <Trash2 size={15} />
-            </button>
-          )}
-        </div>
-
-        {post.content && (
-          <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap break-words">
-            {post.content}
-          </p>
-        )}
-
-        {post.image_url && (
-          <img
-            src={post.image_url}
-            alt=""
-            className="mt-3 rounded-xl w-full object-cover max-h-80"
-            loading="lazy"
-          />
-        )}
-
-        <div className="mt-3 pt-3 border-t border-gray-50 flex items-center gap-4">
-          <button
-            onClick={onLike}
-            className={`flex items-center gap-1.5 text-sm transition-colors ${
-              liked ? 'text-red-500' : 'text-gray-400 hover:text-red-400'
-            }`}
-          >
-            <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
-            <span className="text-xs font-medium">{likeCount > 0 ? likeCount : ''}</span>
-          </button>
-        </div>
       </div>
     </div>
   )

@@ -15,6 +15,7 @@ export type FeedPost = {
   author_avatar: string | null
   likes_count: number
   user_liked: boolean
+  comments_count: number
 }
 
 export default async function FeedPage() {
@@ -66,6 +67,20 @@ export default async function FeedPage() {
     if (like.user_id === user.id) userLikedSet.add(like.post_id)
   }
 
+  // Comment counts — graceful if table doesn't exist yet
+  const commentsByPost: Record<string, number> = {}
+  try {
+    if (postIds.length > 0) {
+      const { data: commentsCountData } = await supabase
+        .from('post_comments')
+        .select('post_id')
+        .in('post_id', postIds)
+      for (const c of commentsCountData ?? []) {
+        commentsByPost[c.post_id] = (commentsByPost[c.post_id] ?? 0) + 1
+      }
+    }
+  } catch { /* post_comments not yet migrated */ }
+
   // Author info
   const authorIds = [...new Set((postsData ?? []).map(p => p.author_id))]
   let profilesData: { id: string; avatar_url: string | null; member_id: string | null }[] = []
@@ -100,6 +115,7 @@ export default async function FeedPage() {
       author_avatar: prof?.avatar_url ?? null,
       likes_count: likesByPost[p.id] ?? 0,
       user_liked: userLikedSet.has(p.id),
+      comments_count: commentsByPost[p.id] ?? 0,
     }
   })
 

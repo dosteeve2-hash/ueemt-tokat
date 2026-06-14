@@ -18,6 +18,16 @@ export default async function ActivitesPage() {
     instagram_url: string | null
     created_at: string
   }[] = []
+  let events: {
+    id: string
+    title: string
+    description: string | null
+    location: string | null
+    event_date: string
+    end_date: string | null
+    image_url: string | null
+    created_at: string
+  }[] = []
   let isAdmin = false
   let userId: string | null = null
 
@@ -41,6 +51,16 @@ export default async function ActivitesPage() {
     activities = act ?? []
     userId = user?.id ?? null
 
+    // Events — graceful if table doesn't exist yet
+    try {
+      const { data: evData } = await supabase
+        .from('events')
+        .select('id, title, description, location, event_date, end_date, image_url, created_at')
+        .eq('is_published', true)
+        .order('event_date', { ascending: true })
+      events = evData ?? []
+    } catch { /* table not yet migrated */ }
+
     if (user) {
       const { data: profile } = await supabase
         .from('user_profiles')
@@ -51,5 +71,13 @@ export default async function ActivitesPage() {
     }
   } catch {}
 
-  return <ActivitesClient albums={albums} activities={activities} isAdmin={isAdmin} userId={userId} />
+  return (
+    <ActivitesClient
+      albums={albums}
+      activities={activities}
+      events={events}
+      isAdmin={isAdmin}
+      userId={userId}
+    />
+  )
 }
