@@ -243,6 +243,9 @@ export default function ProfilClient({ profile, member, userId }: Props) {
               placeholder="Ex : « L'éducation est l'arme la plus puissante. » — Mandela"
               className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
             />
+            <p className={`text-xs mt-1 text-right ${quote.length > 180 ? 'text-orange-500' : 'text-gray-400'} ${quote.length > 195 ? 'text-red-500' : ''}`}>
+              {quote.length}/200
+            </p>
           </div>
 
           <div className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-xl">

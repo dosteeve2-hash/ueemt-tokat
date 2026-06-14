@@ -8,6 +8,10 @@ import { createClient } from '@/lib/supabase/client'
 
 type View = 'login' | 'forgot' | 'forgot-sent'
 
+function isValidEmail(val: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)
+}
+
 function ConnexionContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -23,6 +27,25 @@ function ConnexionContent() {
       ? 'Ce lien est invalide ou a expiré. Connectez-vous avec votre mot de passe.'
       : '',
   )
+
+  // Règle 2 — inline validation state
+  const [emailTouched, setEmailTouched] = useState(false)
+  const [passwordTouched, setPasswordTouched] = useState(false)
+
+  const emailError =
+    emailTouched && email.length > 0 && !isValidEmail(email)
+      ? "Format d'email invalide"
+      : ''
+
+  // Règle 1 — disable submit when fields empty
+  const loginDisabled = !email.trim() || !password || loading
+
+  // Règle 5 — password hints (login: informational only, not blocking)
+  const pwCriteria = [
+    { label: 'Au moins 8 caractères', met: password.length >= 8 },
+    { label: 'Au moins une lettre', met: /[a-zA-Z]/.test(password) },
+  ]
+  const showPwHints = passwordTouched && password.length > 0
 
   useEffect(() => {
     const supabase = createClient()
@@ -88,7 +111,7 @@ function ConnexionContent() {
             {view === 'forgot-sent' && 'Email envoyé !'}
           </h1>
           <p className="text-gray-500 text-sm mt-1.5">
-            {view === 'login' && 'Espace réservé aux membres de l\'UEEMT-Tokat'}
+            {view === 'login' && "Espace réservé aux membres de l'UEEMT-Tokat"}
             {view === 'forgot' && 'Entrez votre email pour recevoir un lien de réinitialisation'}
             {view === 'forgot-sent' && `Vérifiez votre boîte mail : ${email}`}
           </p>
@@ -111,12 +134,17 @@ function ConnexionContent() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl pl-9 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                  onBlur={() => setEmailTouched(true)}
+                  className={`w-full border rounded-xl pl-9 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm transition-colors ${
+                    emailError ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                  }`}
                   placeholder="votre@email.com"
                   autoComplete="email"
-                  required
                 />
               </div>
+              {emailError && (
+                <p className="text-red-500 text-xs mt-1">{emailError}</p>
+              )}
             </div>
 
             <div>
@@ -129,10 +157,10 @@ function ConnexionContent() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  onBlur={() => setPasswordTouched(true)}
                   className="w-full border border-gray-200 rounded-xl pl-9 pr-10 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
                   placeholder="••••••••"
                   autoComplete="current-password"
-                  required
                 />
                 <button
                   type="button"
@@ -143,6 +171,23 @@ function ConnexionContent() {
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+
+              {/* Règle 5 — hints informatifs (login ne bloque pas) */}
+              {showPwHints && (
+                <ul className="mt-2 space-y-1">
+                  {pwCriteria.map((c) => (
+                    <li
+                      key={c.label}
+                      className={`flex items-center gap-1.5 text-xs transition-colors ${
+                        c.met ? 'text-green-600' : 'text-gray-400'
+                      }`}
+                    >
+                      <span className="w-3 text-center">{c.met ? '✓' : '○'}</span>
+                      {c.label}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             <div className="flex justify-end">
@@ -155,10 +200,21 @@ function ConnexionContent() {
               </button>
             </div>
 
+            {/* Règle 1 — expliquer ce qui manque */}
+            {loginDisabled && !loading && (email.length > 0 || password.length > 0) && (
+              <p className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
+                {!email.trim()
+                  ? "L'adresse email est requise."
+                  : !password
+                  ? 'Le mot de passe est requis.'
+                  : ''}
+              </p>
+            )}
+
             <button
               type="submit"
-              disabled={loading}
-              className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white py-3 rounded-xl font-bold transition-colors min-h-[48px]"
+              disabled={loginDisabled}
+              className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-colors min-h-[48px]"
             >
               {loading ? 'Connexion...' : 'Se connecter'}
             </button>
@@ -185,18 +241,23 @@ function ConnexionContent() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl pl-9 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                  onBlur={() => setEmailTouched(true)}
+                  className={`w-full border rounded-xl pl-9 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm transition-colors ${
+                    emailError ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                  }`}
                   placeholder="votre@email.com"
                   autoComplete="email"
-                  required
                 />
               </div>
+              {emailError && (
+                <p className="text-red-500 text-xs mt-1">{emailError}</p>
+              )}
             </div>
 
             <button
               type="submit"
-              disabled={loading}
-              className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white py-3 rounded-xl font-bold transition-colors min-h-[48px]"
+              disabled={loading || !email.trim()}
+              className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-colors min-h-[48px]"
             >
               {loading ? 'Envoi...' : 'Recevoir le lien de réinitialisation'}
             </button>

@@ -82,6 +82,13 @@ export default function Step2({ formData, update, onNext, onBack }: Props) {
         />
       </div>
 
+      {/* Règle 1 — expliquer ce qui manque */}
+      {!formData.statut && (
+        <p className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg -mt-1">
+          Sélectionnez votre statut pour continuer.
+        </p>
+      )}
+
       <div className="flex gap-3 mt-4">
         <button
           type="button"
@@ -92,7 +99,8 @@ export default function Step2({ formData, update, onNext, onBack }: Props) {
         </button>
         <button
           type="submit"
-          className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold transition-colors"
+          disabled={!formData.statut}
+          className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-colors"
         >
           Continuer →
         </button>

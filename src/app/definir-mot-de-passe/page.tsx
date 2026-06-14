@@ -20,6 +20,19 @@ function DefinirMotDePasseContent() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
+  // Règle 5 — critères en temps réel
+  const criteria = [
+    { label: 'Au moins 8 caractères', met: password.length >= 8 },
+    { label: 'Au moins une majuscule', met: /[A-Z]/.test(password) },
+    { label: 'Au moins un chiffre', met: /[0-9]/.test(password) },
+    { label: 'Les mots de passe correspondent', met: password === confirm && password.length > 0 },
+  ]
+  const strength = criteria.filter((c) => c.met).length
+  const allMet = strength === criteria.length
+
+  const barColor =
+    strength <= 1 ? 'bg-red-400' : strength === 2 ? 'bg-orange-400' : 'bg-green-500'
+
   // Exchange the reset code for a session — must run on mount, client-side only
   useEffect(() => {
     if (!code) {
@@ -39,15 +52,7 @@ function DefinirMotDePasseContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-
-    if (password.length < 8) {
-      setError('Le mot de passe doit contenir au moins 8 caractères.')
-      return
-    }
-    if (password !== confirm) {
-      setError('Les mots de passe ne correspondent pas.')
-      return
-    }
+    if (!allMet) return
 
     setLoading(true)
     try {
@@ -86,7 +91,7 @@ function DefinirMotDePasseContent() {
           </h1>
           <p className="text-gray-500 text-sm mt-1.5">
             {success
-              ? 'Redirection vers le fil d\'actualité…'
+              ? "Redirection vers le fil d'actualité…"
               : 'Choisissez un mot de passe sécurisé pour votre compte UEEMT'}
           </p>
         </div>
@@ -133,8 +138,6 @@ function DefinirMotDePasseContent() {
                   className="w-full border border-gray-200 rounded-xl pl-9 pr-10 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
                   placeholder="Minimum 8 caractères"
                   autoComplete="new-password"
-                  required
-                  minLength={8}
                 />
                 <button
                   type="button"
@@ -160,7 +163,6 @@ function DefinirMotDePasseContent() {
                   className="w-full border border-gray-200 rounded-xl pl-9 pr-10 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
                   placeholder="Répétez votre mot de passe"
                   autoComplete="new-password"
-                  required
                 />
                 <button
                   type="button"
@@ -173,33 +175,58 @@ function DefinirMotDePasseContent() {
               </div>
             </div>
 
-            {/* Password strength hint */}
-            {password.length > 0 && (
-              <div className="flex gap-1">
-                {[1, 2, 3, 4].map((level) => (
-                  <div
-                    key={level}
-                    className={`h-1 flex-1 rounded-full transition-colors ${
-                      password.length >= level * 3
-                        ? password.length >= 12
-                          ? 'bg-green-500'
-                          : password.length >= 8
-                          ? 'bg-yellow-400'
-                          : 'bg-red-400'
-                        : 'bg-gray-200'
-                    }`}
-                  />
-                ))}
+            {/* Règle 5 — checklist + barre de progression */}
+            {(password.length > 0 || confirm.length > 0) && (
+              <div className="space-y-3">
+                {/* Barre colorée */}
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4].map((level) => (
+                    <div
+                      key={level}
+                      className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
+                        strength >= level ? barColor : 'bg-gray-200'
+                      }`}
+                    />
+                  ))}
+                </div>
+
+                {/* Checklist */}
+                <ul className="space-y-1.5">
+                  {criteria.map((c) => (
+                    <li
+                      key={c.label}
+                      className={`flex items-center gap-2 text-xs transition-colors ${
+                        c.met ? 'text-green-600' : 'text-gray-400'
+                      }`}
+                    >
+                      <span className={`w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] flex-shrink-0 transition-colors ${
+                        c.met ? 'bg-green-500' : 'bg-gray-200'
+                      }`}>
+                        {c.met ? '✓' : ''}
+                      </span>
+                      {c.label}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
 
+            {/* Règle 1 — disabled tant que tous les critères ne sont pas cochés */}
             <button
               type="submit"
-              disabled={loading}
-              className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white py-3 rounded-xl font-bold transition-colors min-h-[48px]"
+              disabled={!allMet || loading}
+              className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-colors min-h-[48px]"
             >
-              {loading ? 'Mise à jour...' : 'Enregistrer le mot de passe'}
+              {loading ? 'Mise à jour...' : 'Définir mon mot de passe'}
             </button>
+
+            {!allMet && password.length > 0 && (
+              <p className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg text-center">
+                {criteria.filter((c) => !c.met).length} critère
+                {criteria.filter((c) => !c.met).length > 1 ? 's' : ''} restant
+                {criteria.filter((c) => !c.met).length > 1 ? 's' : ''}
+              </p>
+            )}
           </form>
         )}
 
