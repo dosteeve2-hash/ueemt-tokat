@@ -2,11 +2,12 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { Menu, X, LayoutDashboard, LogOut, Rss, User, Sun, Moon } from 'lucide-react'
+import { Menu, X, LayoutDashboard, LogOut, Rss, User, Sun, Moon, Search } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { createClient } from '@/lib/supabase/client'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
+import SearchOverlay from '@/components/SearchOverlay'
 
 const LANG_FLAGS: Record<string, string> = { fr: '🇫🇷', en: '🇬🇧', tr: '🇹🇷' }
 
@@ -58,6 +59,7 @@ function ThemeToggle() {
 
 export default function Navbar() {
   const [open, setOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [logoUrl, setLogoUrl] = useState('/logo.jpeg')
@@ -121,6 +123,7 @@ export default function Navbar() {
     : user?.email?.split('@')[0] ?? ''
 
   return (
+    <>
     <nav className="sticky top-0 z-50 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
@@ -157,6 +160,14 @@ export default function Navbar() {
               </Link>
             )}
 
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="p-2 rounded-lg text-gray-500 hover:text-green-600 hover:bg-gray-100 dark:text-slate-400 dark:hover:text-green-400 dark:hover:bg-slate-700 transition-colors"
+              aria-label="Rechercher"
+              title="Rechercher"
+            >
+              <Search size={18} />
+            </button>
             <LangSelector />
             <ThemeToggle />
 
@@ -206,8 +217,15 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Mobile: theme toggle + hamburger */}
+          {/* Mobile: search + theme toggle + hamburger */}
           <div className="md:hidden flex items-center gap-1">
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="p-2 rounded-lg text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+              aria-label="Rechercher"
+            >
+              <Search size={20} />
+            </button>
             <ThemeToggle />
             <button
               className="p-2 rounded-lg text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
@@ -291,5 +309,7 @@ export default function Navbar() {
         )}
       </div>
     </nav>
+    {searchOpen && <SearchOverlay onClose={() => setSearchOpen(false)} />}
+  </>
   )
 }

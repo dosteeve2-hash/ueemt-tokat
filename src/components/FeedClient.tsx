@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useTransition, useRef } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Heart, Trash2, Megaphone, Send, Loader2, MessageCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { Heart, Trash2, Megaphone, Send, Loader2, MessageCircle, ChevronDown, ChevronUp, ImagePlus, X } from 'lucide-react'
 import { createPost, deletePost, toggleLike, addComment, deleteComment, getCommentsWithAuthors } from '@/app/feed/actions'
+import { createClient } from '@/lib/supabase/client'
 import type { FeedPost } from '@/app/feed/page'
 import type { PostCommentData } from '@/app/feed/actions'
 
@@ -43,6 +44,21 @@ function Avatar({ name, avatar, size = 10, colorIdx = 0 }: { name: string; avata
       {initials}
     </div>
   )
+}
+
+async function resizeImage(file: File, maxPx = 1080): Promise<Blob> {
+  return new Promise(resolve => {
+    const img = new Image()
+    img.onload = () => {
+      const ratio = Math.min(maxPx / img.width, maxPx / img.height, 1)
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.width * ratio)
+      canvas.height = Math.round(img.height * ratio)
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+      canvas.toBlob(b => resolve(b!), 'image/jpeg', 0.85)
+    }
+    img.src = URL.createObjectURL(file)
+  })
 }
 
 // ─── Comment Section (lazy-loaded) ──────────────────────────────────────────
@@ -132,7 +148,6 @@ function CommentSection({
 
   return (
     <div className="border-t border-gray-50 mt-3 pt-3">
-      {/* Toggle button */}
       <button
         onClick={handleToggle}
         className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-green-600 transition-colors"
@@ -186,7 +201,6 @@ function CommentSection({
             )
           })}
 
-          {/* Comment input */}
           <div className="flex gap-2.5 pt-1">
             <Avatar name={myName} avatar={currentUserAvatar} size={7} colorIdx={colorIdx} />
             <div className="flex-1 flex items-end gap-2">
@@ -230,6 +244,7 @@ function PostCard({
   colorIdx,
   onLike,
   onDelete,
+  onImageClick,
   pinned,
   currentUserId,
   currentUserAvatar,
@@ -242,6 +257,7 @@ function PostCard({
   colorIdx: number
   onLike: () => void
   onDelete: () => void
+  onImageClick: (url: string) => void
   pinned: boolean
   currentUserId: string
   currentUserAvatar: string | null
@@ -250,7 +266,10 @@ function PostCard({
   const authorName = `${post.author_prenom} ${post.author_nom}`.trim() || 'Membre'
 
   return (
-    <div className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${pinned ? 'border-green-200' : 'border-gray-100'}`}>
+    <div
+      id={`post-${post.id}`}
+      className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${pinned ? 'border-green-200' : 'border-gray-100'}`}
+    >
       {pinned && (
         <div className="bg-green-600 text-white text-xs font-semibold px-4 py-1.5 flex items-center gap-1.5">
           <Megaphone size={12} /> Annonce du bureau
@@ -276,7 +295,18 @@ function PostCard({
         )}
 
         {post.image_url && (
-          <img src={post.image_url} alt="" className="mt-3 rounded-xl w-full object-cover max-h-80" loading="lazy" />
+          <button
+            onClick={() => onImageClick(post.image_url!)}
+            className="block w-full mt-3 cursor-zoom-in"
+            aria-label="Agrandir l'image"
+          >
+            <img
+              src={post.image_url}
+              alt=""
+              className="rounded-xl w-full object-cover max-h-80 hover:opacity-95 transition-opacity"
+              loading="lazy"
+            />
+          </button>
         )}
 
         <div className="mt-3 flex items-center gap-4">
@@ -313,21 +343,51 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
     Object.fromEntries(initialPosts.map(p => [p.id, p.likes_count]))
   )
   const [newContent, setNewContent] = useState('')
+  const [selectedImage, setSelectedImage] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [isPosting, startPostTransition] = useTransition()
   const [, startDeleteTransition] = useTransition()
   const [, startLikeTransition] = useTransition()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!lightboxUrl) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setLightboxUrl(null) }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [lightboxUrl])
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setSelectedImage(file)
+    const reader = new FileReader()
+    reader.onload = () => setImagePreview(reader.result as string)
+    reader.readAsDataURL(file)
+  }
+
+  const clearImage = () => {
+    setSelectedImage(null)
+    setImagePreview(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
 
   const myName = `${currentUserName.prenom} ${currentUserName.nom}`.trim() || 'Moi'
+  const canPost = (newContent.trim().length > 0 || !!selectedImage) && !isPosting
 
   const handlePost = () => {
-    if (!newContent.trim() || isPosting) return
+    if (!canPost) return
     const content = newContent.trim()
+    const fileToUpload = selectedImage
+    const preview = imagePreview
+
     const optimisticPost: FeedPost = {
       id: `temp-${Date.now()}`,
       type: 'post',
       content,
-      image_url: null,
+      image_url: preview,
       is_pinned: false,
       created_at: new Date().toISOString(),
       author_id: currentUserId,
@@ -341,10 +401,23 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
     setPosts(prev => [optimisticPost, ...prev])
     setLikeCounts(prev => ({ ...prev, [optimisticPost.id]: 0 }))
     setNewContent('')
+    clearImage()
 
     startPostTransition(async () => {
       try {
-        await createPost(content)
+        let imageUrl: string | undefined
+        if (fileToUpload) {
+          const blob = await resizeImage(fileToUpload)
+          const supabase = createClient()
+          const path = `posts/${currentUserId}/${Date.now()}.jpg`
+          const { error: uploadErr } = await supabase.storage
+            .from('photos')
+            .upload(path, blob, { contentType: 'image/jpeg' })
+          if (!uploadErr) {
+            imageUrl = supabase.storage.from('photos').getPublicUrl(path).data.publicUrl
+          }
+        }
+        await createPost(content, imageUrl)
         router.refresh()
       } catch {
         setPosts(prev => prev.filter(p => p.id !== optimisticPost.id))
@@ -407,11 +480,49 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
                 maxLength={2000}
                 className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
               />
+
+              {/* Image preview */}
+              {imagePreview && (
+                <div className="relative mt-2 inline-block">
+                  <img
+                    src={imagePreview}
+                    alt="Aperçu"
+                    className="max-h-40 rounded-xl object-cover border border-gray-200"
+                  />
+                  <button
+                    onClick={clearImage}
+                    className="absolute -top-2 -right-2 bg-gray-800 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors"
+                    aria-label="Supprimer l'image"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+
               <div className="flex items-center justify-between mt-2">
-                <p className="text-xs text-gray-400">{newContent.length}/2000 · Ctrl+Entrée pour publier</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-gray-400">{newContent.length}/2000 · Ctrl+Entrée pour publier</p>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-1 text-xs text-gray-400 hover:text-green-600 transition-colors px-2 py-1 rounded-lg hover:bg-gray-50"
+                    aria-label="Ajouter une photo"
+                  >
+                    <ImagePlus size={15} />
+                    <span>Photo</span>
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    className="hidden"
+                    aria-label="Sélectionner une image"
+                  />
+                </div>
                 <button
                   onClick={handlePost}
-                  disabled={!newContent.trim() || isPosting}
+                  disabled={!canPost}
                   className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
                 >
                   {isPosting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
@@ -433,6 +544,7 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
             colorIdx={i}
             onLike={() => handleLike(post.id)}
             onDelete={() => handleDelete(post.id)}
+            onImageClick={setLightboxUrl}
             pinned
             currentUserId={currentUserId}
             currentUserAvatar={currentUserAvatar}
@@ -467,6 +579,7 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
             colorIdx={i + pinnedPosts.length}
             onLike={() => handleLike(post.id)}
             onDelete={() => handleDelete(post.id)}
+            onImageClick={setLightboxUrl}
             pinned={false}
             currentUserId={currentUserId}
             currentUserAvatar={currentUserAvatar}
@@ -474,6 +587,31 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
           />
         ))}
       </div>
+
+      {/* Image lightbox */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightboxUrl(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Image agrandie"
+        >
+          <button
+            className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors p-2 rounded-lg bg-black/30"
+            onClick={() => setLightboxUrl(null)}
+            aria-label="Fermer"
+          >
+            <X size={22} />
+          </button>
+          <img
+            src={lightboxUrl}
+            alt=""
+            className="max-w-full max-h-full object-contain rounded-xl"
+            onClick={e => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   )
 }
