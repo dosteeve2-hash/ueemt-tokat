@@ -9,6 +9,8 @@ import { createClient } from '@/lib/supabase/client'
 import { uploadPhoto } from '@/lib/supabase/storage'
 import { approuverMembre, refuserMembre } from '@/app/dashboard/admin/actions'
 import { toast } from '@/lib/toast'
+import { ConfirmModal } from '@/components/ConfirmModal'
+import { useModal } from '@/hooks/useModal'
 
 interface Member {
   id: string
@@ -81,6 +83,8 @@ export default function AdminDashboardClient({
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [, startApprovalTransition] = useTransition()
+  const refuseModal = useModal()
+  const [memberToReject, setMemberToReject] = useState<Member | null>(null)
 
   // Album creation
   const [showAlbumForm, setShowAlbumForm] = useState(false)
@@ -171,7 +175,16 @@ export default function AdminDashboardClient({
     })
   }
 
-  const handleRefuser = (id: string) => {
+  const openRefuseModal = (member: Member) => {
+    setMemberToReject(member)
+    refuseModal.open()
+  }
+
+  const handleRefuser = () => {
+    if (!memberToReject) return
+    const id = memberToReject.id
+    refuseModal.close()
+    setMemberToReject(null)
     setRejectingId(id)
     startApprovalTransition(async () => {
       const { error } = await refuserMembre(id)
@@ -483,7 +496,7 @@ export default function AdminDashboardClient({
                               {approvingId === m.id ? 'Envoi...' : 'Approuver'}
                             </button>
                             <button
-                              onClick={() => handleRefuser(m.id)}
+                              onClick={() => openRefuseModal(m)}
                               disabled={approvingId === m.id || rejectingId === m.id}
                               className="flex items-center gap-1.5 border border-red-200 hover:bg-red-50 disabled:opacity-60 text-red-500 px-3 py-1.5 rounded-lg text-xs font-bold min-h-[36px] transition-colors"
                             >
@@ -912,6 +925,17 @@ export default function AdminDashboardClient({
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={refuseModal.isOpen}
+        onClose={refuseModal.close}
+        onConfirm={handleRefuser}
+        title={memberToReject ? `Refuser ${memberToReject.prenom} ${memberToReject.nom} ?` : 'Refuser ce membre ?'}
+        description="Cette action est irréversible. La demande d'inscription sera définitivement refusée."
+        confirmLabel="Refuser"
+        confirmVariant="danger"
+        isLoading={!!rejectingId}
+      />
     </div>
   )
 }
