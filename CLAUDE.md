@@ -303,4 +303,60 @@ Layer 4 : données qui dépendent strictement de layer 3
 
 ---
 
+## Feedback utilisateur — Toast / Modal / Inline
+
+Règle : la gravité détermine la proximité et le niveau de blocage.
+
+| Type | Quand | Librairie / Fichier |
+|---|---|---|
+| Toast | Non-critique, peut être raté | Sonner → `src/lib/toast.ts` |
+| Modal | Bloquant, action requise | `src/components/Modal.tsx` + `ConfirmModal.tsx` |
+| Inline | À côté du champ/bouton concerné | État local du composant |
+
+### Usage toast
+```typescript
+import { toast } from '@/lib/toast'
+
+toast.success('Titre', 'Description optionnelle')
+toast.error('Erreur', 'Message générique côté client')
+toast.info('Info')
+toast.loading('En cours...')   // retourne un id
+toast.dismiss(id)              // dismiss après chargement
+```
+
+### ConfirmModal — obligatoire avant toute suppression irréversible
+```tsx
+import { ConfirmModal } from '@/components/ConfirmModal'
+import { useModal } from '@/hooks/useModal'
+
+const confirm = useModal()
+const [idToDelete, setIdToDelete] = useState<string | null>(null)
+
+// Au clic sur "Supprimer" :
+<button onClick={() => { setIdToDelete(item.id); confirm.open() }}>Supprimer</button>
+
+<ConfirmModal
+  isOpen={confirm.isOpen}
+  onClose={confirm.close}
+  onConfirm={async () => { await handleDelete(idToDelete!); confirm.close(); toast.success('Supprimé') }}
+  title="Supprimer ?"
+  description="Cette action est irréversible."
+  confirmLabel="Supprimer"
+  confirmVariant="danger"
+/>
+```
+
+### Modal générique
+```tsx
+import { Modal } from '@/components/Modal'
+import { useModal } from '@/hooks/useModal'
+
+const m = useModal()
+<Modal isOpen={m.isOpen} onClose={m.close} title="Titre" size="md">
+  {/* contenu */}
+</Modal>
+```
+
+---
+
 *Maintenu par Steve Donald Compaoré — dernière mise à jour : 2026-06-14*

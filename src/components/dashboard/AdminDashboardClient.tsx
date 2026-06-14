@@ -2,12 +2,13 @@
 
 import { useState, useRef, useEffect, useTransition } from 'react'
 import {
-  Users, CheckCircle, XCircle, Clock, Image as ImageIcon,
+  Users, CheckCircle, Clock, Image as ImageIcon,
   Plus, ChevronDown, ChevronUp, Pencil, Trash2, Upload, X, Check, Settings, UserCheck, UserX,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { uploadPhoto } from '@/lib/supabase/storage'
 import { approuverMembre, refuserMembre } from '@/app/dashboard/admin/actions'
+import { toast } from '@/lib/toast'
 
 interface Member {
   id: string
@@ -79,7 +80,6 @@ export default function AdminDashboardClient({
   const [activities, setActivities] = useState(initActivities)
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const [rejectingId, setRejectingId] = useState<string | null>(null)
-  const [approvalMsg, setApprovalMsg] = useState<{ id: string; msg: string; ok: boolean } | null>(null)
   const [, startApprovalTransition] = useTransition()
 
   // Album creation
@@ -121,7 +121,6 @@ export default function AdminDashboardClient({
   const [savingSettings, setSavingSettings] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [uploadingHeroPhoto, setUploadingHeroPhoto] = useState(false)
-  const [settingsMsg, setSettingsMsg] = useState('')
   const logoFileRef = useRef<HTMLInputElement>(null)
   const heroPhotoFileRef = useRef<HTMLInputElement>(null)
 
@@ -163,13 +162,12 @@ export default function AdminDashboardClient({
     startApprovalTransition(async () => {
       const { error } = await approuverMembre(id)
       if (error) {
-        setApprovalMsg({ id, msg: error, ok: false })
+        toast.error('Erreur lors de l\'approbation', error)
       } else {
         setMembers((m) => m.map((x) => (x.id === id ? { ...x, is_validated: true } : x)))
-        setApprovalMsg({ id, msg: 'Membre approuvé — lien d\'accès envoyé !', ok: true })
+        toast.success('Membre approuvé !', 'Un email d\'accès lui a été envoyé.')
       }
       setApprovingId(null)
-      setTimeout(() => setApprovalMsg(null), 4000)
     })
   }
 
@@ -178,10 +176,11 @@ export default function AdminDashboardClient({
     startApprovalTransition(async () => {
       const { error } = await refuserMembre(id)
       if (error) {
-        setApprovalMsg({ id, msg: error, ok: false })
+        toast.error('Erreur', 'Impossible de refuser ce membre pour l\'instant.')
         setRejectingId(null)
       } else {
         setMembers((m) => m.filter((x) => x.id !== id))
+        toast.info('Demande refusée')
         setRejectingId(null)
       }
     })
@@ -336,12 +335,16 @@ export default function AdminDashboardClient({
   // ── Settings ─────────────────────────────────────────────────
   const saveHeroText = async () => {
     setSavingSettings(true)
-    await upsertSetting('hero_title', heroTitle)
-    await upsertSetting('hero_subtitle', heroSubtitle)
-    await upsertSetting('hero_tagline', heroTagline)
-    setSavingSettings(false)
-    setSettingsMsg('Textes hero sauvegardes !')
-    setTimeout(() => setSettingsMsg(''), 2500)
+    try {
+      await upsertSetting('hero_title', heroTitle)
+      await upsertSetting('hero_subtitle', heroSubtitle)
+      await upsertSetting('hero_tagline', heroTagline)
+      toast.success('Textes sauvegardés !', 'La page d\'accueil est mise à jour.')
+    } catch {
+      toast.error('Erreur lors de la sauvegarde', 'Réessaie dans un instant.')
+    } finally {
+      setSavingSettings(false)
+    }
   }
 
   const uploadLogo = async (file: File) => {
@@ -353,8 +356,9 @@ export default function AdminDashboardClient({
       const { data } = supabase.storage.from('avatars').getPublicUrl(path)
       setLogoUrl(data.publicUrl)
       await upsertSetting('logo_url', data.publicUrl)
-      setSettingsMsg('Logo mis a jour !')
-      setTimeout(() => setSettingsMsg(''), 2500)
+      toast.success('Logo mis à jour !')
+    } else {
+      toast.error('Erreur upload logo', 'Vérifie le format du fichier.')
     }
     setUploadingLogo(false)
     if (logoFileRef.current) logoFileRef.current.value = ''
@@ -488,11 +492,6 @@ export default function AdminDashboardClient({
                             </button>
                           </div>
                         </div>
-                        {approvalMsg?.id === m.id && (
-                          <p className={`mt-2 text-xs font-medium px-3 py-1.5 rounded-lg ${approvalMsg.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
-                            {approvalMsg.msg}
-                          </p>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -790,12 +789,6 @@ export default function AdminDashboardClient({
           <div className="space-y-6">
             {loadingSettings && (
               <div className="text-center py-8 text-gray-400 text-sm">Chargement des paramètres...</div>
-            )}
-
-            {settingsMsg && (
-              <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 text-sm font-semibold">
-                {settingsMsg}
-              </div>
             )}
 
             {!loadingSettings && (

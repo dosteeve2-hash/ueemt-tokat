@@ -9,6 +9,9 @@ import type { FeedPost } from '@/app/feed/page'
 import type { PostCommentData } from '@/app/feed/actions'
 import type { StoryData } from '@/app/feed/stories-actions'
 import StoriesRow from '@/components/StoriesRow'
+import { ConfirmModal } from '@/components/ConfirmModal'
+import { useModal } from '@/hooks/useModal'
+import { toast } from '@/lib/toast'
 
 // TODO: Pour les vidéos volumineuses en production, migrer vers Cloudflare R2 (10 GB gratuit)
 // au lieu de Supabase Storage (1 GB sur free tier). Voir cloudflare.com/developer-platform/r2/
@@ -430,6 +433,9 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
     Object.fromEntries(initialPosts.map(p => [p.id, p.likes_count]))
   )
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const deleteModal = useModal()
+  const [postToDelete, setPostToDelete] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Stale-while-revalidate: quand router.refresh() retourne de nouvelles données,
   // on swap silencieusement sans effacer les anciens posts (les posts temp restent visibles)
@@ -618,19 +624,35 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
         await createPost(content, imageUrl, documentUrl, documentName)
         setIsRefreshing(true)
         router.refresh()
+        toast.success('Post publié !', 'Ton post est visible par tous les membres.')
       } catch {
         setPosts(prev => prev.filter(p => p.id !== optimisticPost.id))
+        toast.error('Publication échouée', 'Vérifie ta connexion et réessaie.')
       }
     })
   }
 
-  const handleDelete = (postId: string) => {
-    setPosts(prev => prev.filter(p => p.id !== postId))
+  const openDeleteModal = (postId: string) => {
+    setPostToDelete(postId)
+    deleteModal.open()
+  }
+
+  const confirmDelete = async () => {
+    if (!postToDelete) return
+    const id = postToDelete
+    setIsDeleting(true)
+    setPosts(prev => prev.filter(p => p.id !== id))
+    deleteModal.close()
+    setPostToDelete(null)
     startDeleteTransition(async () => {
       try {
-        await deletePost(postId)
+        await deletePost(id)
+        toast.success('Post supprimé')
       } catch {
+        toast.error('Erreur lors de la suppression', 'Réessaie dans un instant.')
         router.refresh()
+      } finally {
+        setIsDeleting(false)
       }
     })
   }
@@ -646,7 +668,22 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
       setLikeCounts(prev => ({ ...prev, [postId]: (prev[postId] ?? 0) + 1 }))
     }
     setLikedSet(newSet)
-    startLikeTransition(async () => { await toggleLike(postId) })
+    startLikeTransition(async () => {
+      try {
+        await toggleLike(postId)
+      } catch {
+        toast.error('Impossible de liker pour l\'instant', 'Vérifie ta connexion.')
+        setLikedSet(prev => {
+          const s = new Set(prev)
+          if (isLiked) s.add(postId); else s.delete(postId)
+          return s
+        })
+        setLikeCounts(prev => ({
+          ...prev,
+          [postId]: isLiked ? (prev[postId] ?? 0) + 1 : Math.max(0, (prev[postId] ?? 1) - 1),
+        }))
+      }
+    })
   }
 
   const pinnedPosts = posts.filter(p => p.is_pinned)
@@ -822,7 +859,7 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
             isOwn={post.author_id === currentUserId}
             colorIdx={i}
             onLike={() => handleLike(post.id)}
-            onDelete={() => handleDelete(post.id)}
+            onDelete={() => openDeleteModal(post.id)}
             onImageClick={setLightboxUrl}
             pinned
             currentUserId={currentUserId}
@@ -857,7 +894,7 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
             isOwn={post.author_id === currentUserId}
             colorIdx={i + pinnedPosts.length}
             onLike={() => handleLike(post.id)}
-            onDelete={() => handleDelete(post.id)}
+            onDelete={() => openDeleteModal(post.id)}
             onImageClick={setLightboxUrl}
             pinned={false}
             currentUserId={currentUserId}
@@ -866,6 +903,17 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
           />
         ))}
       </div>
+
+      <ConfirmModal
+        isOpen={deleteModal.isOpen}
+        onClose={deleteModal.close}
+        onConfirm={confirmDelete}
+        title="Supprimer ce post ?"
+        description="Cette action est irréversible. Le post et ses commentaires seront définitivement supprimés."
+        confirmLabel="Supprimer"
+        confirmVariant="danger"
+        isLoading={isDeleting}
+      />
 
       {/* Image lightbox */}
       {lightboxUrl && (

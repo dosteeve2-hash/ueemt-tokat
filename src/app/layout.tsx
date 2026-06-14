@@ -7,6 +7,7 @@ import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistratio
 import { ThemeProvider } from '@/components/ThemeProvider'
 import { LanguageProvider } from '@/contexts/LanguageContext'
 import PushNotificationSetup from '@/components/PushNotificationSetup'
+import { Toaster } from 'sonner'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -89,6 +90,17 @@ export default function RootLayout({
             <main>{children}</main>
             <PushNotificationSetup />
             <Footer />
+            <Toaster
+              position="bottom-right"
+              richColors
+              closeButton
+              duration={3500}
+              toastOptions={{
+                classNames: {
+                  toast: 'font-sans text-sm',
+                },
+              }}
+            />
           </LanguageProvider>
         </ThemeProvider>
       </body>
