@@ -130,6 +130,7 @@ export async function deleteComment(commentId: string): Promise<void> {
     .from('post_comments')
     .delete()
     .eq('id', commentId)
+    .eq('author_id', user.id)
 
   if (error) throw new Error(error.message)
 }

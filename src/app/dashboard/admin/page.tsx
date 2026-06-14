@@ -51,7 +51,7 @@ export default async function AdminDashboardPage() {
       />
     )
   } catch (e: unknown) {
-    if (e instanceof Error && e.message === 'NEXT_REDIRECT') throw e
+    if (typeof (e as { digest?: string }).digest === 'string' && (e as { digest?: string }).digest?.startsWith('NEXT_REDIRECT')) throw e
     redirect('/connexion')
   }
 }
