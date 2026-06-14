@@ -46,8 +46,17 @@ export default function Footer() {
             <p className="text-gray-500 text-xs mt-4">Tokat, Türkiye</p>
           </div>
         </div>
-        <div className="border-t border-gray-800 mt-8 pt-6 text-center text-gray-500 text-xs">
-          © {new Date().getFullYear()} UEEMT-Tokat. Tous droits réservés.
+        <div className="border-t border-gray-800 mt-8 pt-6 text-center text-gray-500 text-xs space-y-2">
+          <p>© {new Date().getFullYear()} UEEMT-Tokat. Tous droits réservés.</p>
+          <div className="flex items-center justify-center gap-4">
+            <Link href="/politique-confidentialite" className="hover:text-green-400 transition-colors">
+              Politique de confidentialité
+            </Link>
+            <span>·</span>
+            <Link href="/conditions-utilisation" className="hover:text-green-400 transition-colors">
+              Conditions d'utilisation
+            </Link>
+          </div>
         </div>
       </div>
     </footer>

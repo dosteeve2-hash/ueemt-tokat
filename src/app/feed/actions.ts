@@ -34,7 +34,10 @@ export async function createPost(
     ...(imageUrl ? { image_url: imageUrl } : {}),
     ...(documentUrl ? { document_url: documentUrl, document_name: documentName ?? null } : {}),
   }).select('id, type, is_pinned').single()
-  if (error) throw new Error(error.message)
+  if (error) {
+    console.error('[createPost]', error.code)
+    throw new Error('Impossible de publier le post. Réessaie.')
+  }
 
   // Notify admins if it's a pinned/announcement post
   if (newPost?.is_pinned) {
@@ -67,7 +70,10 @@ export async function deletePost(postId: string) {
     .delete()
     .eq('id', postId)
     .eq('author_id', user.id)
-  if (error) throw new Error(error.message)
+  if (error) {
+    console.error('[deletePost]', error.code)
+    throw new Error('Impossible de supprimer le post.')
+  }
 }
 
 export async function toggleLike(postId: string) {
@@ -112,7 +118,10 @@ export async function addComment(postId: string, content: string): Promise<strin
     .select('id')
     .single()
 
-  if (error) throw new Error(error.message)
+  if (error) {
+    console.error('[addComment]', error.code)
+    throw new Error('Impossible d\'ajouter le commentaire.')
+  }
 
   // Notify post author
   const { data: post } = await supabase
@@ -138,7 +147,10 @@ export async function deleteComment(commentId: string): Promise<void> {
     .eq('id', commentId)
     .eq('author_id', user.id)
 
-  if (error) throw new Error(error.message)
+  if (error) {
+    console.error('[deleteComment]', error.code)
+    throw new Error('Impossible de supprimer le commentaire.')
+  }
 }
 
 export async function getCommentsWithAuthors(postId: string): Promise<PostCommentData[]> {

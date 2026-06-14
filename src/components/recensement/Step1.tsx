@@ -75,6 +75,18 @@ export default function Step1({ formData, update, onNext }: Props) {
         />
       </div>
 
+      {/* Honeypot — ne pas remplir */}
+      <input
+        type="text"
+        name="website"
+        value={formData.honeypot}
+        onChange={(e) => update({ honeypot: e.target.value })}
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+        style={{ position: 'absolute', left: '-9999px', opacity: 0, height: 0 }}
+      />
+
       <button
         type="submit"
         className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold transition-colors mt-4"

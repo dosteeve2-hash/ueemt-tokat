@@ -192,7 +192,10 @@ export async function marquerPaye(memberId: string, amount: number, notes?: stri
       paid_at: new Date().toISOString(),
     }, { onConflict: 'member_id,month' })
 
-  if (error) throw new Error(error.message)
+  if (error) {
+    console.error('[marquerPaye]', error.code)
+    throw new Error('Impossible d\'enregistrer le paiement.')
+  }
 }
 
 export async function annulerPaiement(memberId: string, month?: string) {
@@ -211,7 +214,10 @@ export async function annulerPaiement(memberId: string, month?: string) {
     .eq('member_id', memberId)
     .eq('month', targetMonth)
 
-  if (error) throw new Error(error.message)
+  if (error) {
+    console.error('[annulerPaiement]', error.code)
+    throw new Error('Impossible d\'annuler le paiement.')
+  }
 }
 
 export async function updateCaisse(montant: number) {
@@ -228,7 +234,10 @@ export async function updateCaisse(montant: number) {
     .update({ montant, updated_at: new Date().toISOString(), updated_by: user.id })
     .eq('id', 1)
 
-  if (error) throw new Error(error.message)
+  if (error) {
+    console.error('[updateCaisse]', error.code)
+    throw new Error('Impossible de mettre à jour la caisse.')
+  }
 }
 
 export async function updateCotisationMensuelle(montant: number) {
@@ -247,5 +256,8 @@ export async function updateCotisationMensuelle(montant: number) {
     .update({ cotisation_mensuelle: montant, updated_at: new Date().toISOString(), updated_by: user.id })
     .eq('id', 1)
 
-  if (error) throw new Error(error.message)
+  if (error) {
+    console.error('[updateCotisationMensuelle]', error.code)
+    throw new Error('Impossible de mettre à jour la cotisation mensuelle.')
+  }
 }

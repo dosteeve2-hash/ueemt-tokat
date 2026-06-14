@@ -18,17 +18,19 @@ export interface FormData {
   niveau: string
   num_etudiant: string
   photo_url: string
+  honeypot: string
 }
 
 const initial: FormData = {
   prenom: '', nom: '', email: '', telephone: '', date_arrivee_tokat: '',
   statut: '', filiere: '', universite: '', niveau: '', num_etudiant: '', photo_url: '',
+  honeypot: '',
 }
 
 export default function RecensementPage() {
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState<FormData>(initial)
-  const [memberId, setMemberId] = useState<string | null>(null)
+  const [registered, setRegistered] = useState(false)
 
   const update = (data: Partial<FormData>) => setFormData(prev => ({ ...prev, ...data }))
 
@@ -58,14 +60,14 @@ export default function RecensementPage() {
       </header>
 
       <div className="max-w-3xl mx-auto px-4 py-10">
-        {memberId ? (
-          <SuccessScreen formData={formData} memberId={memberId} />
+        {registered ? (
+          <SuccessScreen formData={formData} />
         ) : step === 1 ? (
           <Step1 formData={formData} update={update} onNext={() => setStep(2)} />
         ) : step === 2 ? (
           <Step2 formData={formData} update={update} onNext={() => setStep(3)} onBack={() => setStep(1)} />
         ) : (
-          <Step3 formData={formData} onBack={() => setStep(2)} onSuccess={setMemberId} />
+          <Step3 formData={formData} onBack={() => setStep(2)} onSuccess={() => setRegistered(true)} />
         )}
       </div>
     </div>

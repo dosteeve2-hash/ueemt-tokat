@@ -2,12 +2,12 @@
 
 import { useState } from 'react'
 import type { FormData } from '@/app/recensement/page'
-import { createClient } from '@/lib/supabase/client'
+import { demandeInscription } from '@/app/recensement/actions'
 
 interface Props {
   formData: FormData
   onBack: () => void
-  onSuccess: (id: string) => void
+  onSuccess: () => void
 }
 
 export default function Step3({ formData, onBack, onSuccess }: Props) {
@@ -21,29 +21,26 @@ export default function Step3({ formData, onBack, onSuccess }: Props) {
     setLoading(true)
     setError('')
 
-    const supabase = createClient()
-    const payload = {
+    const result = await demandeInscription({
       prenom: formData.prenom,
       nom: formData.nom,
-      email: formData.email || null,
-      telephone: formData.telephone || null,
-      date_arrivee_tokat: formData.date_arrivee_tokat || null,
-      statut: formData.statut || 'Étudiant',
-      filiere: formData.filiere || null,
-      universite: formData.universite || null,
-      niveau: formData.niveau || null,
-      num_etudiant: formData.num_etudiant || null,
-      is_validated: false,
-      cotisation_payee: false,
-    }
+      email: formData.email,
+      telephone: formData.telephone || undefined,
+      date_arrivee_tokat: formData.date_arrivee_tokat || undefined,
+      statut: formData.statut || undefined,
+      filiere: formData.filiere || undefined,
+      universite: formData.universite || undefined,
+      niveau: formData.niveau || undefined,
+      num_etudiant: formData.num_etudiant || undefined,
+      honeypot: formData.honeypot || undefined,
+    })
 
-    const { data, error: err } = await supabase.from('members').insert([payload]).select('id').single()
     setLoading(false)
 
-    if (err) {
-      setError(err.message.includes('duplicate') ? 'Cet email est déjà enregistré.' : "Erreur lors de l'inscription. Réessayez.")
-    } else if (data) {
-      onSuccess(data.id)
+    if (result.error) {
+      setError(result.error)
+    } else {
+      onSuccess()
     }
   }
 

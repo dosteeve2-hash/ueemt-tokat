@@ -17,7 +17,10 @@ export async function updateProfile(formData: FormData) {
     .update({ bio: bio || null, quote: quote || null, is_public: isPublic })
     .eq('id', user.id)
 
-  if (error) throw new Error(error.message)
+  if (error) {
+    console.error('[updateProfile]', error.code)
+    throw new Error('Impossible de mettre à jour le profil.')
+  }
 }
 
 export async function updateAvatarUrl(avatarUrl: string) {
@@ -25,9 +28,17 @@ export async function updateAvatarUrl(avatarUrl: string) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/connexion')
 
+  // Basic URL safety check
+  if (avatarUrl && !avatarUrl.startsWith('https://')) {
+    throw new Error('URL avatar invalide.')
+  }
+
   const { error } = await supabase
     .from('user_profiles')
     .update({ avatar_url: avatarUrl })
     .eq('id', user.id)
-  if (error) throw new Error(error.message)
+  if (error) {
+    console.error('[updateAvatarUrl]', error.code)
+    throw new Error('Impossible de mettre à jour l\'avatar.')
+  }
 }

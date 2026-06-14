@@ -450,10 +450,18 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
     return () => document.removeEventListener('keydown', handler)
   }, [lightboxUrl])
 
+  const hasDoubleExtension = (name: string) => /\.[a-z]{2,4}\.[a-z]{2,4}$/i.test(name)
+
   const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setUploadError(null)
+
+    if (hasDoubleExtension(file.name)) {
+      setUploadError('Nom de fichier invalide.')
+      e.target.value = ''
+      return
+    }
 
     if (file.type.startsWith('video/')) {
       if (file.size > 50 * 1024 * 1024) {
@@ -483,6 +491,12 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
     const file = e.target.files?.[0]
     if (!file) return
     setUploadError(null)
+
+    if (hasDoubleExtension(file.name)) {
+      setUploadError('Nom de fichier invalide.')
+      e.target.value = ''
+      return
+    }
 
     if (file.size > 10 * 1024 * 1024) {
       setUploadError('Document trop volumineux (max 10 MB)')

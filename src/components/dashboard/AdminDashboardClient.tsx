@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useTransition } from 'react'
 import {
   Users, CheckCircle, XCircle, Clock, Image as ImageIcon,
-  Plus, ChevronDown, ChevronUp, Pencil, Trash2, Upload, X, Check, Settings,
+  Plus, ChevronDown, ChevronUp, Pencil, Trash2, Upload, X, Check, Settings, UserCheck, UserX,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { uploadPhoto } from '@/lib/supabase/storage'
+import { approuverMembre, refuserMembre } from '@/app/dashboard/admin/actions'
 
 interface Member {
   id: string
@@ -76,6 +77,10 @@ export default function AdminDashboardClient({
   const [members, setMembers] = useState(initMembers)
   const [albums, setAlbums] = useState(initAlbums)
   const [activities, setActivities] = useState(initActivities)
+  const [approvingId, setApprovingId] = useState<string | null>(null)
+  const [rejectingId, setRejectingId] = useState<string | null>(null)
+  const [approvalMsg, setApprovalMsg] = useState<{ id: string; msg: string; ok: boolean } | null>(null)
+  const [, startApprovalTransition] = useTransition()
 
   // Album creation
   const [showAlbumForm, setShowAlbumForm] = useState(false)
@@ -153,9 +158,33 @@ export default function AdminDashboardClient({
   }
 
   // ── Members ───────────────────────────────────────────────────
-  const toggleValidation = async (id: string, current: boolean) => {
-    await supabase.from('members').update({ is_validated: !current }).eq('id', id)
-    setMembers((m) => m.map((x) => (x.id === id ? { ...x, is_validated: !current } : x)))
+  const handleApprouver = (id: string) => {
+    setApprovingId(id)
+    startApprovalTransition(async () => {
+      const { error } = await approuverMembre(id)
+      if (error) {
+        setApprovalMsg({ id, msg: error, ok: false })
+      } else {
+        setMembers((m) => m.map((x) => (x.id === id ? { ...x, is_validated: true } : x)))
+        setApprovalMsg({ id, msg: 'Membre approuvé — lien d\'accès envoyé !', ok: true })
+      }
+      setApprovingId(null)
+      setTimeout(() => setApprovalMsg(null), 4000)
+    })
+  }
+
+  const handleRefuser = (id: string) => {
+    setRejectingId(id)
+    startApprovalTransition(async () => {
+      const { error } = await refuserMembre(id)
+      if (error) {
+        setApprovalMsg({ id, msg: error, ok: false })
+        setRejectingId(null)
+      } else {
+        setMembers((m) => m.filter((x) => x.id !== id))
+        setRejectingId(null)
+      }
+    })
   }
 
   const toggleCotisation = async (id: string, current: boolean) => {
@@ -417,37 +446,99 @@ export default function AdminDashboardClient({
         </div>
 
         {/* ── MEMBRES ── */}
-        {tab === 'membres' && (
-          <div className="space-y-3">
-            {members.map((m) => (
-              <div key={m.id} className="bg-white rounded-xl border border-gray-100 p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-sm flex-shrink-0">
-                    {m.prenom[0]}{m.nom[0]}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-gray-900 text-sm">{m.prenom} {m.nom}</p>
-                    <p className="text-gray-400 text-xs truncate">{m.filiere ?? m.statut}</p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${m.is_validated ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-600'}`}>
-                      {m.is_validated ? 'Validé' : 'En attente'}
-                    </span>
-                    <button onClick={() => toggleValidation(m.id, m.is_validated)} className="p-1.5 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 min-h-[36px] min-w-[36px] flex items-center justify-center">
-                      {m.is_validated ? <XCircle size={15} /> : <CheckCircle size={15} />}
-                    </button>
-                    <button
-                      onClick={() => toggleCotisation(m.id, m.cotisation_payee)}
-                      className={`text-xs px-2 py-1.5 rounded-lg border font-medium min-h-[36px] ${m.cotisation_payee ? 'border-green-200 text-green-600 bg-green-50' : 'border-red-200 text-red-500'}`}
-                    >
-                      Cotis.
-                    </button>
+        {tab === 'membres' && (() => {
+          const pending = members.filter(m => !m.is_validated)
+          const validated = members.filter(m => m.is_validated)
+          return (
+            <div className="space-y-6">
+              {/* Inscriptions en attente */}
+              {pending.length > 0 && (
+                <div>
+                  <h2 className="text-sm font-bold text-orange-600 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <Clock size={14} /> Inscriptions en attente ({pending.length})
+                  </h2>
+                  <div className="space-y-3">
+                    {pending.map((m) => (
+                      <div key={m.id} className="bg-white rounded-xl border border-orange-100 p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-700 font-bold text-sm flex-shrink-0">
+                            {m.prenom[0]}{m.nom[0]}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-gray-900 text-sm">{m.prenom} {m.nom}</p>
+                            <p className="text-gray-400 text-xs truncate">{m.filiere ?? m.statut}</p>
+                            {m.universite && <p className="text-gray-400 text-xs">{m.universite}</p>}
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <button
+                              onClick={() => handleApprouver(m.id)}
+                              disabled={approvingId === m.id || rejectingId === m.id}
+                              className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white px-3 py-1.5 rounded-lg text-xs font-bold min-h-[36px] transition-colors"
+                            >
+                              <UserCheck size={13} />
+                              {approvingId === m.id ? 'Envoi...' : 'Approuver'}
+                            </button>
+                            <button
+                              onClick={() => handleRefuser(m.id)}
+                              disabled={approvingId === m.id || rejectingId === m.id}
+                              className="flex items-center gap-1.5 border border-red-200 hover:bg-red-50 disabled:opacity-60 text-red-500 px-3 py-1.5 rounded-lg text-xs font-bold min-h-[36px] transition-colors"
+                            >
+                              <UserX size={13} />
+                              {rejectingId === m.id ? '...' : 'Refuser'}
+                            </button>
+                          </div>
+                        </div>
+                        {approvalMsg?.id === m.id && (
+                          <p className={`mt-2 text-xs font-medium px-3 py-1.5 rounded-lg ${approvalMsg.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+                            {approvalMsg.msg}
+                          </p>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
+              )}
+
+              {/* Membres validés */}
+              <div>
+                {pending.length > 0 && (
+                  <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <CheckCircle size={14} /> Membres validés ({validated.length})
+                  </h2>
+                )}
+                <div className="space-y-3">
+                  {validated.map((m) => (
+                    <div key={m.id} className="bg-white rounded-xl border border-gray-100 p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-sm flex-shrink-0">
+                          {m.prenom[0]}{m.nom[0]}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-gray-900 text-sm">{m.prenom} {m.nom}</p>
+                          <p className="text-gray-400 text-xs truncate">{m.filiere ?? m.statut}</p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+                          <span className="text-xs px-2 py-1 rounded-full font-medium bg-green-100 text-green-700">Validé</span>
+                          <button
+                            onClick={() => toggleCotisation(m.id, m.cotisation_payee)}
+                            className={`text-xs px-2 py-1.5 rounded-lg border font-medium min-h-[36px] ${m.cotisation_payee ? 'border-green-200 text-green-600 bg-green-50' : 'border-red-200 text-red-500'}`}
+                          >
+                            Cotis.
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {validated.length === 0 && (
+                    <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-400 text-sm">
+                      Aucun membre validé pour l'instant.
+                    </div>
+                  )}
+                </div>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          )
+        })()}
 
         {/* ── ALBUMS ── */}
         {tab === 'albums' && (
