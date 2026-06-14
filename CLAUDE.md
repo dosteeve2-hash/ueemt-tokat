@@ -199,4 +199,39 @@ Avant tout PR ou mise en production :
 
 ---
 
+## Stratégie de déploiement
+
+### Staging (avant mise en production)
+- Chaque PR sur GitHub crée automatiquement une **Preview URL** sur Vercel
+- Format : `https://ueemt-tokat-git-<branch>-<user>.vercel.app`
+- **Toujours tester sur la preview** avant de merger sur main
+- La preview utilise les variables d'environnement de production (configurable dans Vercel → Settings → Environment Variables → Preview)
+
+### Rollback (si ça casse en prod)
+1. Aller sur https://vercel.com → projet ueemt-tokat → onglet **Deployments**
+2. Cliquer sur le déploiement précédent (en statut "Ready")
+3. Cliquer sur les **trois points** → **"Promote to Production"**
+4. Le rollback est instantané, 0 downtime
+
+### Variables d'environnement à configurer dans Vercel
+- `NEXT_PUBLIC_SUPABASE_URL` — public
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — public
+- `SUPABASE_SERVICE_ROLE_KEY` — serveur seulement, chiffré
+- `NEXT_PUBLIC_SENTRY_DSN` — public (à ajouter après création compte Sentry)
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY` — public
+- `VAPID_PRIVATE_KEY` — serveur seulement
+- `RESEND_API_KEY` — serveur seulement
+
+### Monitoring
+- **Sentry** : créer un compte sur https://sentry.io → nouveau projet Next.js → copier le DSN → l'ajouter dans Vercel en tant que `NEXT_PUBLIC_SENTRY_DSN`
+- **UptimeRobot** : https://uptimerobot.com → moniteur HTTP sur https://ueemt-tokat.vercel.app → alerte email si down > 5 min
+
+### Tests automatisés
+- `npm test` — lance Vitest en mode CI (une seule passe)
+- `npm run test:watch` — mode interactif en développement
+- Tests dans `src/__tests__/` : `validation.test.ts`, `rate-limit.test.ts`
+- Ajouter `npm test` dans le workflow CI avant chaque déploiement
+
+---
+
 *Maintenu par Steve Donald Compaoré — dernière mise à jour : 2026-06-14*

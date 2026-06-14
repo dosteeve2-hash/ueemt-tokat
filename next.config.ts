@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next'
+import { withSentryConfig } from '@sentry/nextjs'
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ['@react-pdf/renderer'],
@@ -30,7 +31,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "font-src 'self' data: https://fonts.gstatic.com",
               "img-src 'self' data: blob: https://ybjrmvvkasohslgsrhzh.supabase.co",
-              "connect-src 'self' https://ybjrmvvkasohslgsrhzh.supabase.co wss://ybjrmvvkasohslgsrhzh.supabase.co https://api.resend.com",
+              "connect-src 'self' https://ybjrmvvkasohslgsrhzh.supabase.co wss://ybjrmvvkasohslgsrhzh.supabase.co https://api.resend.com https://*.sentry.io",
               "frame-ancestors 'none'",
             ].join('; '),
           },
@@ -47,4 +48,9 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default nextConfig
+export default withSentryConfig(nextConfig, {
+  org: 'ueemt-tokat',
+  project: 'ueemt-tokat',
+  silent: true,
+  widenClientFileUpload: true,
+})
