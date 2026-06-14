@@ -81,12 +81,15 @@ export async function createStory(params: {
 
   if (profile?.role !== 'admin') throw new Error('Action réservée aux admins')
 
+  const expiresAt = new Date(Date.now() + 24 * 3_600_000).toISOString()
+
   const { error } = await supabase.from('stories').insert({
     author_id: user.id,
     image_url: params.imageUrl ?? null,
     text: params.text?.trim().slice(0, 200) ?? null,
     bg_color: params.bgColor ?? '#0F1C3F',
     text_color: params.textColor ?? '#FFFFFF',
+    expires_at: expiresAt,
   })
 
   if (error) throw new Error(error.message)

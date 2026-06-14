@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Plus, X, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { Plus, X, ChevronLeft, ChevronRight, Loader2, Share2 } from 'lucide-react'
 import { createStory, deleteStory } from '@/app/feed/stories-actions'
 import { createClient } from '@/lib/supabase/client'
 import type { StoryData } from '@/app/feed/stories-actions'
@@ -98,6 +98,14 @@ function StoryViewer({
     onClose()
   }
 
+  const handleShare = async () => {
+    const url = 'https://ueemt-tokat.vercel.app/feed'
+    if (navigator.share) {
+      try { await navigator.share({ title: 'UEEMT-Tokat', url }); return } catch { /* cancelled */ }
+    }
+    await navigator.clipboard.writeText(url).catch(() => {})
+  }
+
   if (!story) return null
 
   return (
@@ -127,6 +135,13 @@ function StoryViewer({
             </div>
           </div>
           <div className="flex items-center gap-1">
+            <button
+              onClick={handleShare}
+              className="text-white/70 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/10"
+              aria-label="Partager"
+            >
+              <Share2 size={16} />
+            </button>
             {isAdmin && story.author_id === currentUserId && (
               <button
                 onClick={handleDelete}

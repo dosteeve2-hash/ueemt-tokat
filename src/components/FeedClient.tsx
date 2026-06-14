@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Heart, Trash2, Megaphone, Send, Loader2, MessageCircle, ChevronDown, ChevronUp, ImagePlus, X } from 'lucide-react'
+import { Heart, Trash2, Megaphone, Send, Loader2, MessageCircle, ChevronDown, ChevronUp, ImagePlus, X, Share2, Check } from 'lucide-react'
 import { createPost, deletePost, toggleLike, addComment, deleteComment, getCommentsWithAuthors } from '@/app/feed/actions'
 import { createClient } from '@/lib/supabase/client'
 import type { FeedPost } from '@/app/feed/page'
@@ -240,6 +240,34 @@ function CommentSection({
 }
 
 // ─── PostCard ────────────────────────────────────────────────────────────────
+function ShareButton({ postId }: { postId: string }) {
+  const [copied, setCopied] = useState(false)
+  const url = `https://ueemt-tokat.vercel.app/feed#post-${postId}`
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'UEEMT-Tokat', url })
+        return
+      } catch { /* user cancelled */ }
+    }
+    await navigator.clipboard.writeText(url).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <button
+      onClick={handleShare}
+      className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-green-600 transition-colors"
+      aria-label="Partager ce post"
+    >
+      {copied ? <Check size={15} className="text-green-500" /> : <Share2 size={15} />}
+      <span className="text-xs font-medium">{copied ? 'Copié !' : 'Partager'}</span>
+    </button>
+  )
+}
+
 function PostCard({
   post,
   liked,
@@ -321,6 +349,7 @@ function PostCard({
             <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
             <span className="text-xs font-medium">{likeCount > 0 ? likeCount : ''}</span>
           </button>
+          <ShareButton postId={post.id} />
         </div>
 
         <CommentSection

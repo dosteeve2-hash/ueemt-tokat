@@ -3,8 +3,24 @@
 import { createClient as createSupabaseServerClient } from '@/lib/supabase/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
-
 const stripBom = (s: string | undefined) => (s ?? '').replace(/^﻿/, '').trim()
+
+// In-memory rate limiter — 3 attempts per email per hour
+// Resets on cold start (fine for Vercel serverless where each instance is isolated)
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
+
+function checkRateLimit(email: string): boolean {
+  const key = email.toLowerCase()
+  const now = Date.now()
+  const entry = rateLimitMap.get(key)
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(key, { count: 1, resetAt: now + 3_600_000 })
+    return true
+  }
+  if (entry.count >= 3) return false
+  entry.count++
+  return true
+}
 
 function buildLoginEmailHtml(actionLink: string): string {
   return `
@@ -56,6 +72,15 @@ export async function sendMagicLink(email: string): Promise<{ error: string | nu
   const supabaseUrl = stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL)
   const resendKey = stripBom(process.env.RESEND_API_KEY)
 
+  const normalizedEmail = email.trim().toLowerCase()
+  if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    return { error: 'Adresse email invalide.' }
+  }
+
+  if (!checkRateLimit(normalizedEmail)) {
+    return { error: 'Trop de tentatives. Réessaie dans 1 heure.' }
+  }
+
   // Admin API path: generates link + sends via Resend (custom template)
   const hasValidServiceKey = serviceKey.startsWith('eyJ')
 
@@ -66,7 +91,7 @@ export async function sendMagicLink(email: string): Promise<{ error: string | nu
 
     const { data, error: linkError } = await admin.auth.admin.generateLink({
       type: 'magiclink',
-      email: email.trim(),
+      email: normalizedEmail,
       options: { redirectTo: `${siteUrl}/auth/callback` },
     })
 
@@ -77,7 +102,7 @@ export async function sendMagicLink(email: string): Promise<{ error: string | nu
     const resend = new Resend(resendKey)
     const { error: emailError } = await resend.emails.send({
       from: 'UEEMT-Tokat <onboarding@resend.dev>',
-      to: [email.trim()],
+      to: [normalizedEmail],
       subject: '🔐 Votre lien de connexion UEEMT-Tokat',
       html: buildLoginEmailHtml(data.properties.action_link),
     })
@@ -89,10 +114,10 @@ export async function sendMagicLink(email: string): Promise<{ error: string | nu
     if (!isTestRestriction) return { error: emailError.message }
   }
 
-  // Fallback: Supabase sends its default email
+  // Fallback: Supabase sends its default email (rate-limited but covers all recipients)
   const supabase = await createSupabaseServerClient()
   const { error } = await supabase.auth.signInWithOtp({
-    email: email.trim(),
+    email: normalizedEmail,
     options: { emailRedirectTo: `${siteUrl}/auth/callback` },
   })
   return { error: error?.message ?? null }
