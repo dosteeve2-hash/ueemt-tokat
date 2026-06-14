@@ -5,9 +5,10 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 const stripBom = (s: string | undefined) => (s ?? '').replace(/^﻿/, '').trim()
 
-// In-memory rate limiter — 3 attempts per email per hour
-// Resets on cold start (fine for Vercel serverless where each instance is isolated)
+// In-memory rate limiters — reset on cold start (fine for Vercel serverless)
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
+const loginRateLimitMap = new Map<string, { count: number; resetAt: number }>()
+const resetRateLimitMap = new Map<string, { count: number; resetAt: number }>()
 
 function checkRateLimit(email: string): boolean {
   const key = email.toLowerCase()
@@ -15,6 +16,34 @@ function checkRateLimit(email: string): boolean {
   const entry = rateLimitMap.get(key)
   if (!entry || now > entry.resetAt) {
     rateLimitMap.set(key, { count: 1, resetAt: now + 3_600_000 })
+    return true
+  }
+  if (entry.count >= 3) return false
+  entry.count++
+  return true
+}
+
+// 5 attempts per email per 15 minutes
+function checkLoginRateLimit(email: string): boolean {
+  const key = email.toLowerCase()
+  const now = Date.now()
+  const entry = loginRateLimitMap.get(key)
+  if (!entry || now > entry.resetAt) {
+    loginRateLimitMap.set(key, { count: 1, resetAt: now + 900_000 })
+    return true
+  }
+  if (entry.count >= 5) return false
+  entry.count++
+  return true
+}
+
+// 3 reset attempts per email per hour
+function checkResetRateLimit(email: string): boolean {
+  const key = email.toLowerCase()
+  const now = Date.now()
+  const entry = resetRateLimitMap.get(key)
+  if (!entry || now > entry.resetAt) {
+    resetRateLimitMap.set(key, { count: 1, resetAt: now + 3_600_000 })
     return true
   }
   if (entry.count >= 3) return false
@@ -64,6 +93,63 @@ function buildLoginEmailHtml(actionLink: string): string {
   </table>
 </body>
 </html>`
+}
+
+export async function signInWithPassword(
+  email: string,
+  password: string,
+): Promise<{ error: string | null }> {
+  const normalizedEmail = email.trim().toLowerCase()
+  if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    return { error: 'Adresse email invalide.' }
+  }
+  if (!password) {
+    return { error: 'Mot de passe requis.' }
+  }
+  if (!checkLoginRateLimit(normalizedEmail)) {
+    return { error: 'Trop de tentatives. Réessaie dans 15 minutes.' }
+  }
+
+  const supabase = await createSupabaseServerClient()
+  const { error } = await supabase.auth.signInWithPassword({
+    email: normalizedEmail,
+    password,
+  })
+
+  if (error) {
+    if (
+      error.message.includes('Invalid login credentials') ||
+      error.message.includes('invalid_credentials')
+    ) {
+      return { error: 'Email ou mot de passe incorrect.' }
+    }
+    if (error.message.includes('Email not confirmed')) {
+      return { error: 'Email non confirmé. Contactez un administrateur UEEMT.' }
+    }
+    return { error: error.message }
+  }
+
+  return { error: null }
+}
+
+export async function sendPasswordReset(email: string): Promise<{ error: string | null }> {
+  const siteUrl = stripBom(process.env.NEXT_PUBLIC_SITE_URL) || 'https://ueemt-tokat.vercel.app'
+  const normalizedEmail = email.trim().toLowerCase()
+
+  if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    return { error: 'Adresse email invalide.' }
+  }
+  if (!checkResetRateLimit(normalizedEmail)) {
+    return { error: 'Trop de tentatives. Réessaie dans 1 heure.' }
+  }
+
+  const supabase = await createSupabaseServerClient()
+  await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+    redirectTo: `${siteUrl}/definir-mot-de-passe`,
+  })
+
+  // Always return success — don't reveal if the email exists
+  return { error: null }
 }
 
 export async function sendMagicLink(email: string): Promise<{ error: string | null }> {
