@@ -2,11 +2,12 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Lock, Mail, Eye, EyeOff, CheckCircle, ArrowLeft } from 'lucide-react'
+import { Lock, Mail, Eye, EyeOff, CheckCircle, ArrowLeft, Users } from 'lucide-react'
 import { signInWithPassword, sendPasswordReset, envoyerLienPremierAcces } from './actions'
 import { createClient } from '@/lib/supabase/client'
+import ChoisirQuiJeSuis from '@/components/ChoisirQuiJeSuis'
 
-type View = 'login' | 'forgot' | 'forgot-sent' | 'premier-acces' | 'premier-acces-sent'
+type View = 'login' | 'forgot' | 'forgot-sent' | 'premier-acces' | 'premier-acces-sent' | 'choisir'
 
 function isValidEmail(val: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)
@@ -28,12 +29,10 @@ function ConnexionContent() {
       : '',
   )
 
-  // Premier accès state
   const [premierAccesEmail, setPremierAccesEmail] = useState('')
   const [premierAccesLoading, setPremierAccesLoading] = useState(false)
   const [premierAccesError, setPremierAccesError] = useState('')
 
-  // Règle 2 — inline validation state
   const [emailTouched, setEmailTouched] = useState(false)
   const [passwordTouched, setPasswordTouched] = useState(false)
 
@@ -42,10 +41,8 @@ function ConnexionContent() {
       ? "Format d'email invalide"
       : ''
 
-  // Règle 1 — disable submit when fields empty
   const loginDisabled = !email.trim() || !password || loading
 
-  // Règle 5 — password hints (login: informational only, not blocking)
   const pwCriteria = [
     { label: 'Au moins 8 caractères', met: password.length >= 8 },
     { label: 'Au moins une lettre', met: /[a-zA-Z]/.test(password) },
@@ -125,6 +122,8 @@ function ConnexionContent() {
           <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             {(view === 'forgot-sent' || view === 'premier-acces-sent') ? (
               <CheckCircle size={26} className="text-green-600" />
+            ) : view === 'choisir' ? (
+              <Users size={26} className="text-green-600" />
             ) : (
               <Lock size={26} className="text-green-600" />
             )}
@@ -135,6 +134,7 @@ function ConnexionContent() {
             {view === 'forgot-sent' && 'Email envoyé !'}
             {view === 'premier-acces' && 'Première connexion'}
             {view === 'premier-acces-sent' && 'Email envoyé !'}
+            {view === 'choisir' && 'Choisir qui je suis'}
           </h1>
           <p className="text-gray-500 text-sm mt-1.5">
             {view === 'login' && "Espace réservé aux membres de l'UEEMT-Tokat"}
@@ -142,10 +142,11 @@ function ConnexionContent() {
             {view === 'forgot-sent' && `Vérifiez votre boîte mail : ${email}`}
             {view === 'premier-acces' && 'Reçois un lien pour définir ton mot de passe'}
             {view === 'premier-acces-sent' && `Vérifiez votre boîte mail : ${premierAccesEmail}`}
+            {view === 'choisir' && 'Identifie-toi sans email — crée ton mot de passe en 3 étapes'}
           </p>
         </div>
 
-        {error && (
+        {error && view !== 'choisir' && (
           <div className="text-sm bg-red-50 p-3 rounded-xl mb-4 space-y-1.5">
             <p className="text-red-600">{error}</p>
             {view === 'login' && error.includes('incorrect') && (
@@ -162,6 +163,11 @@ function ConnexionContent() {
               </p>
             )}
           </div>
+        )}
+
+        {/* ── Choisir qui je suis ── */}
+        {view === 'choisir' && (
+          <ChoisirQuiJeSuis onBack={() => { setView('login'); setError('') }} />
         )}
 
         {/* ── Login form ── */}
@@ -215,7 +221,6 @@ function ConnexionContent() {
                 </button>
               </div>
 
-              {/* Règle 5 — hints informatifs (login ne bloque pas) */}
               {showPwHints && (
                 <ul className="mt-2 space-y-1">
                   {pwCriteria.map((c) => (
@@ -243,7 +248,6 @@ function ConnexionContent() {
               </button>
             </div>
 
-            {/* Règle 1 — expliquer ce qui manque */}
             {loginDisabled && !loading && (email.length > 0 || password.length > 0) && (
               <p className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
                 {!email.trim()
@@ -262,19 +266,32 @@ function ConnexionContent() {
               {loading ? 'Connexion...' : 'Se connecter'}
             </button>
 
-            <div className="mt-2 pt-5 border-t border-gray-100 text-center">
-              <p className="text-sm text-gray-500 mb-2">Première connexion sur UEEMT ?</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setPremierAccesEmail(email)
-                  setView('premier-acces')
-                  setError('')
-                }}
-                className="text-sm text-green-700 hover:text-green-800 font-medium underline underline-offset-2"
-              >
-                Envoyer un lien d&apos;activation →
-              </button>
+            <div className="mt-2 pt-5 border-t border-gray-100 space-y-3 text-center">
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Première connexion sur UEEMT ?</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPremierAccesEmail(email)
+                    setView('premier-acces')
+                    setError('')
+                  }}
+                  className="text-sm text-green-700 hover:text-green-800 font-medium underline underline-offset-2"
+                >
+                  Envoyer un lien d&apos;activation →
+                </button>
+              </div>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => { setView('choisir'); setError('') }}
+                  className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-semibold"
+                >
+                  <Users size={15} />
+                  Choisir qui je suis →
+                </button>
+                <p className="text-xs text-gray-400 mt-0.5">Sans email — crée ton mot de passe directement</p>
+              </div>
             </div>
           </form>
         )}
@@ -376,7 +393,7 @@ function ConnexionContent() {
               disabled={premierAccesLoading || !premierAccesEmail.trim()}
               className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-colors min-h-[48px]"
             >
-              {premierAccesLoading ? 'Envoi...' : 'Envoyer un lien d\'activation'}
+              {premierAccesLoading ? 'Envoi...' : "Envoyer un lien d'activation"}
             </button>
 
             <button

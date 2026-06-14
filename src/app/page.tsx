@@ -137,11 +137,16 @@ export default async function HomePage() {
             </>
           ) : (
             <>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">Rejoignez la communauté UEEMT-Tokat</h2>
-              <p className="text-green-100 mb-8 text-base sm:text-lg">Recensez-vous pour faire partie officiellement de notre association et accéder à tous nos services.</p>
-              <Link href="/recensement" className="bg-white text-green-700 hover:bg-green-50 px-8 sm:px-10 py-4 rounded-xl font-bold text-base sm:text-lg inline-block transition-colors shadow-lg">
-                Se Recenser →
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">Espace membres UEEMT-Tokat</h2>
+              <p className="text-green-100 mb-8 text-base sm:text-lg">Tu es déjà membre ? Connecte-toi pour accéder à l&apos;espace communautaire.</p>
+              <Link href="/connexion" className="bg-white text-green-700 hover:bg-green-50 px-8 sm:px-10 py-4 rounded-xl font-bold text-base sm:text-lg inline-block transition-colors shadow-lg">
+                Se connecter →
               </Link>
+              <div className="mt-4">
+                <Link href="/recensement" className="text-green-200 hover:text-white text-sm underline underline-offset-2 transition-colors">
+                  Nouveau membre ? Se recenser
+                </Link>
+              </div>
             </>
           )}
         </div>

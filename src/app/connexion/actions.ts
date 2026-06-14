@@ -10,6 +10,7 @@ const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
 const loginRateLimitMap = new Map<string, { count: number; resetAt: number }>()
 const resetRateLimitMap = new Map<string, { count: number; resetAt: number }>()
 const premierAccesRateLimitMap = new Map<string, { count: number; resetAt: number }>()
+const verifierIdentiteRateLimitMap = new Map<string, { count: number; resetAt: number }>()
 
 function checkRateLimit(email: string): boolean {
   const key = email.toLowerCase()
@@ -66,6 +67,20 @@ function checkPremierAccesRateLimit(email: string): boolean {
   return true
 }
 
+// 5 attempts per email per 10 minutes
+function checkVerifierIdentiteRateLimit(email: string): boolean {
+  const key = email.toLowerCase()
+  const now = Date.now()
+  const entry = verifierIdentiteRateLimitMap.get(key)
+  if (!entry || now > entry.resetAt) {
+    verifierIdentiteRateLimitMap.set(key, { count: 1, resetAt: now + 600_000 })
+    return true
+  }
+  if (entry.count >= 5) return false
+  entry.count++
+  return true
+}
+
 function buildPasswordSetupEmailHtml(actionLink: string): string {
   return `
 <!DOCTYPE html>
@@ -75,17 +90,12 @@ function buildPasswordSetupEmailHtml(actionLink: string): string {
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 20px">
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
-        <!-- Header -->
         <tr><td style="background:#14A44D;padding:32px 40px;border-radius:12px 12px 0 0;text-align:center">
           <h1 style="color:white;margin:0;font-size:24px;font-weight:800;letter-spacing:-0.5px">🎓 UEEMT-Tokat</h1>
           <p style="color:rgba(255,255,255,0.8);margin:6px 0 0;font-size:13px">Union des Élèves et Étudiants Maliens à Tokat</p>
         </td></tr>
-        <!-- Body -->
         <tr><td style="background:white;padding:40px;border-radius:0 0 12px 12px">
           <h2 style="color:#111827;margin:0 0 16px;font-size:20px;font-weight:700">Votre demande a été approuvée ✅</h2>
-          <p style="color:#6b7280;font-size:15px;line-height:1.7;margin:0 0 16px">
-            Félicitations ! Votre demande d'adhésion à l'UEEMT-Tokat a été approuvée par l'administration.
-          </p>
           <p style="color:#6b7280;font-size:15px;line-height:1.7;margin:0 0 32px">
             Cliquez sur le bouton ci-dessous pour <strong style="color:#111827">définir votre mot de passe</strong>
             et accéder à votre espace membre. Ce lien est valable pendant <strong style="color:#111827">1 heure</strong>.
@@ -122,12 +132,10 @@ function buildLoginEmailHtml(actionLink: string): string {
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:40px 20px">
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
-        <!-- Header -->
         <tr><td style="background:#14A44D;padding:32px 40px;border-radius:12px 12px 0 0;text-align:center">
           <h1 style="color:white;margin:0;font-size:24px;font-weight:800;letter-spacing:-0.5px">🎓 UEEMT-Tokat</h1>
           <p style="color:rgba(255,255,255,0.8);margin:6px 0 0;font-size:13px">Union des Élèves et Étudiants Maliens à Tokat</p>
         </td></tr>
-        <!-- Body -->
         <tr><td style="background:white;padding:40px;border-radius:0 0 12px 12px">
           <h2 style="color:#111827;margin:0 0 16px;font-size:20px;font-weight:700">Votre accès membres est prêt ✅</h2>
           <p style="color:#6b7280;font-size:15px;line-height:1.7;margin:0 0 32px">
@@ -210,7 +218,6 @@ export async function sendPasswordReset(email: string): Promise<{ error: string 
     redirectTo: `${siteUrl}/definir-mot-de-passe`,
   })
 
-  // Always return success — don't reveal if the email exists
   return { error: null }
 }
 
@@ -256,7 +263,6 @@ export async function sendPasswordSetupEmail(email: string): Promise<{ error: st
     if (!isTestRestriction) return { error: emailError.message }
   }
 
-  // Fallback : Supabase envoie son email par défaut (reset password)
   const supabase = await createSupabaseServerClient()
   const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
     redirectTo: `${siteUrl}/definir-mot-de-passe`,
@@ -279,9 +285,6 @@ function buildPremierAccesEmailHtml(actionLink: string): string {
         </td></tr>
         <tr><td style="background:white;padding:40px;border-radius:0 0 12px 12px">
           <h2 style="color:#111827;margin:0 0 16px;font-size:20px;font-weight:700">Bienvenue sur UEEMT — Définissez votre mot de passe 🎉</h2>
-          <p style="color:#6b7280;font-size:15px;line-height:1.7;margin:0 0 16px">
-            Ton compte UEEMT-Tokat a été approuvé.
-          </p>
           <p style="color:#6b7280;font-size:15px;line-height:1.7;margin:0 0 32px">
             Clique sur le lien ci-dessous pour <strong style="color:#111827">définir ton mot de passe</strong> et accéder à la plateforme.
             Ce lien expire dans <strong style="color:#111827">24h</strong>.
@@ -326,7 +329,6 @@ export async function envoyerLienPremierAcces(
     return { error: 'Trop de tentatives. Réessaie dans 1 heure.' }
   }
 
-  // Generic success returned in all non-error cases — prevents email enumeration
   const genericSuccess = {
     error: null,
     message: 'Si ton adresse est reconnue, tu vas recevoir un email dans quelques minutes.',
@@ -339,8 +341,6 @@ export async function envoyerLienPremierAcces(
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  // Verify member exists in the members table (no validation status check —
-  // Steve tells his friends directly when they're approved)
   const { data: member } = await admin
     .from('members')
     .select('id')
@@ -349,7 +349,6 @@ export async function envoyerLienPremierAcces(
 
   if (!member) return genericSuccess
 
-  // Generate recovery link via admin API
   const { data, error: linkError } = await admin.auth.admin.generateLink({
     type: 'recovery',
     email: normalizedEmail,
@@ -358,7 +357,6 @@ export async function envoyerLienPremierAcces(
 
   if (linkError || !data?.properties?.action_link) return genericSuccess
 
-  // Send via Resend — fall through to Supabase if Resend is in test mode
   if (resendKey) {
     const resend = new Resend(resendKey)
     const { error: resendError } = await resend.emails.send({
@@ -368,10 +366,8 @@ export async function envoyerLienPremierAcces(
       html: buildPremierAccesEmailHtml(data.properties.action_link),
     })
 
-    // If Resend succeeded, we're done
     if (!resendError) return genericSuccess
 
-    // If it's NOT a test-mode restriction, log and fall through anyway
     const isTestRestriction =
       resendError.message?.includes('testing emails') ||
       resendError.message?.includes('own email')
@@ -380,7 +376,6 @@ export async function envoyerLienPremierAcces(
     }
   }
 
-  // Fallback: Supabase sends its default recovery email
   const supabase = await createSupabaseServerClient()
   await supabase.auth.resetPasswordForEmail(normalizedEmail, {
     redirectTo: `${siteUrl}/definir-mot-de-passe`,
@@ -404,7 +399,6 @@ export async function sendMagicLink(email: string): Promise<{ error: string | nu
     return { error: 'Trop de tentatives. Réessaie dans 1 heure.' }
   }
 
-  // Admin API path: generates link + sends via Resend (custom template)
   const hasValidServiceKey = serviceKey.startsWith('eyJ')
 
   if (hasValidServiceKey && resendKey) {
@@ -430,18 +424,159 @@ export async function sendMagicLink(email: string): Promise<{ error: string | nu
       html: buildLoginEmailHtml(data.properties.action_link),
     })
 
-    // Resend test-mode restriction: can only send to account owner's email.
-    // Fall through to Supabase signInWithOtp for all other recipients.
     if (!emailError) return { error: null }
     const isTestRestriction = emailError.message?.includes('testing emails') || emailError.message?.includes('own email')
     if (!isTestRestriction) return { error: emailError.message }
   }
 
-  // Fallback: Supabase sends its default email (rate-limited but covers all recipients)
   const supabase = await createSupabaseServerClient()
   const { error } = await supabase.auth.signInWithOtp({
     email: normalizedEmail,
     options: { emailRedirectTo: `${siteUrl}/auth/callback` },
   })
   return { error: error?.message ?? null }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Flow "Choisir qui je suis" — sans email, sans lien magique
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function getMembresList(): Promise<{
+  membres: Array<{ id: string; nom_complet: string; filiere: string | null }>
+  error: string | null
+}> {
+  try {
+    const supabase = await createSupabaseServerClient()
+    const { data, error } = await supabase
+      .from('members')
+      .select('id, nom_complet, filiere')
+      .eq('is_active', true)
+      .order('nom_complet')
+
+    if (error) return { membres: [], error: error.message }
+    return { membres: (data ?? []) as Array<{ id: string; nom_complet: string; filiere: string | null }>, error: null }
+  } catch (e) {
+    return { membres: [], error: String(e) }
+  }
+}
+
+export async function verifierIdentite(
+  memberId: string,
+  email: string,
+): Promise<{ error: string | null }> {
+  const normalizedEmail = email.trim().toLowerCase()
+  if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    return { error: 'Adresse email invalide.' }
+  }
+  if (!checkVerifierIdentiteRateLimit(normalizedEmail)) {
+    return { error: 'Trop de tentatives. Réessaie dans 10 minutes.' }
+  }
+
+  const serviceKey = stripBom(process.env.SUPABASE_SERVICE_ROLE_KEY)
+  const supabaseUrl = stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL)
+  const hasValidServiceKey = serviceKey.startsWith('eyJ')
+
+  const client = hasValidServiceKey
+    ? createAdminClient(supabaseUrl, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+    : await createSupabaseServerClient()
+
+  const { data: member } = await client
+    .from('members')
+    .select('id')
+    .eq('id', memberId)
+    .eq('email', normalizedEmail)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!member) {
+    return { error: "Cet email ne correspond pas à ce membre. Vérifie ton email." }
+  }
+  return { error: null }
+}
+
+export async function creerMotDePasseEtConnecter(
+  memberId: string,
+  email: string,
+  password: string,
+): Promise<{ error: string | null }> {
+  const normalizedEmail = email.trim().toLowerCase()
+
+  if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    return { error: 'Adresse email invalide.' }
+  }
+  if (!password || password.length < 8) {
+    return { error: 'Le mot de passe doit contenir au moins 8 caractères.' }
+  }
+
+  const serviceKey = stripBom(process.env.SUPABASE_SERVICE_ROLE_KEY)
+  const supabaseUrl = stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL)
+  const hasValidServiceKey = serviceKey.startsWith('eyJ')
+
+  if (!hasValidServiceKey) {
+    return { error: 'Configuration serveur manquante. Contacte un administrateur.' }
+  }
+
+  const admin = createAdminClient(supabaseUrl, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+
+  // Re-vérification de sécurité : email + memberId doivent correspondre
+  const { data: member } = await admin
+    .from('members')
+    .select('id')
+    .eq('id', memberId)
+    .eq('email', normalizedEmail)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (!member) {
+    return { error: "Cet email ne correspond pas à ce membre." }
+  }
+
+  // Essai de création — si déjà existant, on met à jour
+  const { error: createError } = await admin.auth.admin.createUser({
+    email: normalizedEmail,
+    password,
+    email_confirm: true,
+  })
+
+  if (createError) {
+    const alreadyExists =
+      createError.message.includes('already been registered') ||
+      createError.message.includes('already registered') ||
+      createError.message.includes('duplicate')
+
+    if (!alreadyExists) {
+      return { error: createError.message }
+    }
+
+    // L'utilisateur existe — on trouve son ID et on met à jour le mot de passe
+    const { data: listData } = await admin.auth.admin.listUsers({ perPage: 1000 })
+    const existingUser = (listData?.users ?? []).find(
+      (u) => u.email?.toLowerCase() === normalizedEmail,
+    )
+
+    if (!existingUser) {
+      return { error: 'Impossible de trouver le compte. Contacte un administrateur.' }
+    }
+
+    const { error: updateError } = await admin.auth.admin.updateUserById(existingUser.id, {
+      password,
+      email_confirm: true,
+    })
+    if (updateError) return { error: updateError.message }
+  }
+
+  // Connexion directe
+  const supabase = await createSupabaseServerClient()
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: normalizedEmail,
+    password,
+  })
+
+  if (signInError) {
+    return { error: signInError.message }
+  }
+
+  return { error: null }
 }
