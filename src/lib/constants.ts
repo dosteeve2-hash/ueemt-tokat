@@ -1,7 +1,7 @@
 export const BUREAU_MEMBERS = [
   { prenom: 'Abdoul Karim', nom: 'FASKOYE', role: 'Président' },
   { prenom: 'Mamadou Bassirou', nom: 'DIAKITE', role: 'Secrétaire Général' },
-  { prenom: 'Steeve Donald', nom: 'COMPAORÉ', role: 'Chargé de Communication' },
+  { prenom: 'Steeve Donald', nom: 'COMPAORÉ', role: 'Adjoint Trésorier' },
   { prenom: 'Ousmane', nom: 'COULIBALY', role: 'Trésorier' },
   { prenom: 'Zakaria', nom: 'BENGALY', role: 'Conseiller' },
   { prenom: 'Idrissa Aly', nom: 'ONGOIBA', role: 'Conseiller' },

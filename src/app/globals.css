@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Class-based dark mode for Tailwind v4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-green: #14A44D;
   --color-yellow: #F0D100;
@@ -25,3 +28,60 @@ body {
   background: #14A44D;
   color: white;
 }
+
+/* ─── Dark mode ─────────────────────────────────────────────── */
+
+.dark body {
+  background-color: #0f172a;
+  color: #f1f5f9;
+}
+
+/* Backgrounds */
+.dark .bg-white          { background-color: #1e293b; }
+.dark .bg-gray-50        { background-color: #0f172a; }
+.dark .bg-gray-100       { background-color: #1e293b; }
+.dark .bg-gray-200       { background-color: #334155; }
+.dark .bg-amber-50       { background-color: #1c1a15; }
+.dark .bg-red-50         { background-color: #1c0f0f; }
+.dark .bg-green-50       { background-color: #0a1f0f; }
+
+/* Text */
+.dark .text-gray-900     { color: #f1f5f9; }
+.dark .text-gray-800     { color: #e2e8f0; }
+.dark .text-gray-700     { color: #cbd5e1; }
+.dark .text-gray-600     { color: #94a3b8; }
+.dark .text-gray-500     { color: #64748b; }
+.dark .text-gray-400     { color: #475569; }
+.dark .text-amber-700    { color: #fbbf24; }
+.dark .text-amber-800    { color: #f59e0b; }
+.dark .text-red-500      { color: #f87171; }
+.dark .text-red-600      { color: #f87171; }
+
+/* Borders */
+.dark .border-gray-50    { border-color: #1e293b; }
+.dark .border-gray-100   { border-color: #334155; }
+.dark .border-gray-200   { border-color: #334155; }
+.dark .border-amber-100  { border-color: #44403c; }
+.dark .border-amber-200  { border-color: #57534e; }
+
+/* Form inputs */
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark textarea,
+.dark select {
+  background-color: #0f172a;
+  color: #f1f5f9;
+  border-color: #334155;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #475569;
+}
+
+/* Dividers */
+.dark .divide-gray-100 > * + * { border-color: #334155; }
+
+/* Shadows in dark mode */
+.dark .shadow-sm  { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); }
+.dark .shadow-md  { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6); }
+.dark .shadow-lg  { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7); }

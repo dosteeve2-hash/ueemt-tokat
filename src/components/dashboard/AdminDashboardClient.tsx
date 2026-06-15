@@ -1,12 +1,16 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useTransition } from 'react'
 import {
-  Users, CheckCircle, XCircle, Clock, Image as ImageIcon,
-  Plus, ChevronDown, ChevronUp, Pencil, Trash2, Upload, X, Check, Settings,
+  Users, CheckCircle, Clock, Image as ImageIcon,
+  Plus, ChevronDown, ChevronUp, Pencil, Trash2, Upload, X, Check, Settings, UserCheck, UserX,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { uploadPhoto } from '@/lib/supabase/storage'
+import { approuverMembre, refuserMembre } from '@/app/dashboard/admin/actions'
+import { toast } from '@/lib/toast'
+import { ConfirmModal } from '@/components/ConfirmModal'
+import { useModal } from '@/hooks/useModal'
 
 interface Member {
   id: string
@@ -76,6 +80,11 @@ export default function AdminDashboardClient({
   const [members, setMembers] = useState(initMembers)
   const [albums, setAlbums] = useState(initAlbums)
   const [activities, setActivities] = useState(initActivities)
+  const [approvingId, setApprovingId] = useState<string | null>(null)
+  const [rejectingId, setRejectingId] = useState<string | null>(null)
+  const [, startApprovalTransition] = useTransition()
+  const refuseModal = useModal()
+  const [memberToReject, setMemberToReject] = useState<Member | null>(null)
 
   // Album creation
   const [showAlbumForm, setShowAlbumForm] = useState(false)
@@ -116,7 +125,6 @@ export default function AdminDashboardClient({
   const [savingSettings, setSavingSettings] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [uploadingHeroPhoto, setUploadingHeroPhoto] = useState(false)
-  const [settingsMsg, setSettingsMsg] = useState('')
   const logoFileRef = useRef<HTMLInputElement>(null)
   const heroPhotoFileRef = useRef<HTMLInputElement>(null)
 
@@ -153,9 +161,42 @@ export default function AdminDashboardClient({
   }
 
   // ── Members ───────────────────────────────────────────────────
-  const toggleValidation = async (id: string, current: boolean) => {
-    await supabase.from('members').update({ is_validated: !current }).eq('id', id)
-    setMembers((m) => m.map((x) => (x.id === id ? { ...x, is_validated: !current } : x)))
+  const handleApprouver = (id: string) => {
+    setApprovingId(id)
+    startApprovalTransition(async () => {
+      const { error } = await approuverMembre(id)
+      if (error) {
+        toast.error('Erreur lors de l\'approbation', error)
+      } else {
+        setMembers((m) => m.map((x) => (x.id === id ? { ...x, is_validated: true } : x)))
+        toast.success('Membre approuvé !', 'Un email d\'accès lui a été envoyé.')
+      }
+      setApprovingId(null)
+    })
+  }
+
+  const openRefuseModal = (member: Member) => {
+    setMemberToReject(member)
+    refuseModal.open()
+  }
+
+  const handleRefuser = () => {
+    if (!memberToReject) return
+    const id = memberToReject.id
+    refuseModal.close()
+    setMemberToReject(null)
+    setRejectingId(id)
+    startApprovalTransition(async () => {
+      const { error } = await refuserMembre(id)
+      if (error) {
+        toast.error('Erreur', 'Impossible de refuser ce membre pour l\'instant.')
+        setRejectingId(null)
+      } else {
+        setMembers((m) => m.filter((x) => x.id !== id))
+        toast.info('Demande refusée')
+        setRejectingId(null)
+      }
+    })
   }
 
   const toggleCotisation = async (id: string, current: boolean) => {
@@ -307,12 +348,16 @@ export default function AdminDashboardClient({
   // ── Settings ─────────────────────────────────────────────────
   const saveHeroText = async () => {
     setSavingSettings(true)
-    await upsertSetting('hero_title', heroTitle)
-    await upsertSetting('hero_subtitle', heroSubtitle)
-    await upsertSetting('hero_tagline', heroTagline)
-    setSavingSettings(false)
-    setSettingsMsg('Textes hero sauvegardes !')
-    setTimeout(() => setSettingsMsg(''), 2500)
+    try {
+      await upsertSetting('hero_title', heroTitle)
+      await upsertSetting('hero_subtitle', heroSubtitle)
+      await upsertSetting('hero_tagline', heroTagline)
+      toast.success('Textes sauvegardés !', 'La page d\'accueil est mise à jour.')
+    } catch {
+      toast.error('Erreur lors de la sauvegarde', 'Réessaie dans un instant.')
+    } finally {
+      setSavingSettings(false)
+    }
   }
 
   const uploadLogo = async (file: File) => {
@@ -324,8 +369,9 @@ export default function AdminDashboardClient({
       const { data } = supabase.storage.from('avatars').getPublicUrl(path)
       setLogoUrl(data.publicUrl)
       await upsertSetting('logo_url', data.publicUrl)
-      setSettingsMsg('Logo mis a jour !')
-      setTimeout(() => setSettingsMsg(''), 2500)
+      toast.success('Logo mis à jour !')
+    } else {
+      toast.error('Erreur upload logo', 'Vérifie le format du fichier.')
     }
     setUploadingLogo(false)
     if (logoFileRef.current) logoFileRef.current.value = ''
@@ -417,37 +463,94 @@ export default function AdminDashboardClient({
         </div>
 
         {/* ── MEMBRES ── */}
-        {tab === 'membres' && (
-          <div className="space-y-3">
-            {members.map((m) => (
-              <div key={m.id} className="bg-white rounded-xl border border-gray-100 p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-sm flex-shrink-0">
-                    {m.prenom[0]}{m.nom[0]}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-gray-900 text-sm">{m.prenom} {m.nom}</p>
-                    <p className="text-gray-400 text-xs truncate">{m.filiere ?? m.statut}</p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${m.is_validated ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-600'}`}>
-                      {m.is_validated ? 'Validé' : 'En attente'}
-                    </span>
-                    <button onClick={() => toggleValidation(m.id, m.is_validated)} className="p-1.5 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 min-h-[36px] min-w-[36px] flex items-center justify-center">
-                      {m.is_validated ? <XCircle size={15} /> : <CheckCircle size={15} />}
-                    </button>
-                    <button
-                      onClick={() => toggleCotisation(m.id, m.cotisation_payee)}
-                      className={`text-xs px-2 py-1.5 rounded-lg border font-medium min-h-[36px] ${m.cotisation_payee ? 'border-green-200 text-green-600 bg-green-50' : 'border-red-200 text-red-500'}`}
-                    >
-                      Cotis.
-                    </button>
+        {tab === 'membres' && (() => {
+          const pending = members.filter(m => !m.is_validated)
+          const validated = members.filter(m => m.is_validated)
+          return (
+            <div className="space-y-6">
+              {/* Inscriptions en attente */}
+              {pending.length > 0 && (
+                <div>
+                  <h2 className="text-sm font-bold text-orange-600 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <Clock size={14} /> Inscriptions en attente ({pending.length})
+                  </h2>
+                  <div className="space-y-3">
+                    {pending.map((m) => (
+                      <div key={m.id} className="bg-white rounded-xl border border-orange-100 p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-700 font-bold text-sm flex-shrink-0">
+                            {m.prenom[0]}{m.nom[0]}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-gray-900 text-sm">{m.prenom} {m.nom}</p>
+                            <p className="text-gray-400 text-xs truncate">{m.filiere ?? m.statut}</p>
+                            {m.universite && <p className="text-gray-400 text-xs">{m.universite}</p>}
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <button
+                              onClick={() => handleApprouver(m.id)}
+                              disabled={approvingId === m.id || rejectingId === m.id}
+                              className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white px-3 py-1.5 rounded-lg text-xs font-bold min-h-[36px] transition-colors"
+                            >
+                              <UserCheck size={13} />
+                              {approvingId === m.id ? 'Envoi...' : 'Approuver'}
+                            </button>
+                            <button
+                              onClick={() => openRefuseModal(m)}
+                              disabled={approvingId === m.id || rejectingId === m.id}
+                              className="flex items-center gap-1.5 border border-red-200 hover:bg-red-50 disabled:opacity-60 text-red-500 px-3 py-1.5 rounded-lg text-xs font-bold min-h-[36px] transition-colors"
+                            >
+                              <UserX size={13} />
+                              {rejectingId === m.id ? '...' : 'Refuser'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
+              )}
+
+              {/* Membres validés */}
+              <div>
+                {pending.length > 0 && (
+                  <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <CheckCircle size={14} /> Membres validés ({validated.length})
+                  </h2>
+                )}
+                <div className="space-y-3">
+                  {validated.map((m) => (
+                    <div key={m.id} className="bg-white rounded-xl border border-gray-100 p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-sm flex-shrink-0">
+                          {m.prenom[0]}{m.nom[0]}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-gray-900 text-sm">{m.prenom} {m.nom}</p>
+                          <p className="text-gray-400 text-xs truncate">{m.filiere ?? m.statut}</p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+                          <span className="text-xs px-2 py-1 rounded-full font-medium bg-green-100 text-green-700">Validé</span>
+                          <button
+                            onClick={() => toggleCotisation(m.id, m.cotisation_payee)}
+                            className={`text-xs px-2 py-1.5 rounded-lg border font-medium min-h-[36px] ${m.cotisation_payee ? 'border-green-200 text-green-600 bg-green-50' : 'border-red-200 text-red-500'}`}
+                          >
+                            Cotis.
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {validated.length === 0 && (
+                    <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-400 text-sm">
+                      Aucun membre validé pour l'instant.
+                    </div>
+                  )}
+                </div>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          )
+        })()}
 
         {/* ── ALBUMS ── */}
         {tab === 'albums' && (
@@ -701,12 +804,6 @@ export default function AdminDashboardClient({
               <div className="text-center py-8 text-gray-400 text-sm">Chargement des paramètres...</div>
             )}
 
-            {settingsMsg && (
-              <div className="bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 text-sm font-semibold">
-                {settingsMsg}
-              </div>
-            )}
-
             {!loadingSettings && (
               <>
                 {/* Logo */}
@@ -828,6 +925,17 @@ export default function AdminDashboardClient({
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={refuseModal.isOpen}
+        onClose={refuseModal.close}
+        onConfirm={handleRefuser}
+        title={memberToReject ? `Refuser ${memberToReject.prenom} ${memberToReject.nom} ?` : 'Refuser ce membre ?'}
+        description="Cette action est irréversible. La demande d'inscription sera définitivement refusée."
+        confirmLabel="Refuser"
+        confirmVariant="danger"
+        isLoading={!!rejectingId}
+      />
     </div>
   )
 }

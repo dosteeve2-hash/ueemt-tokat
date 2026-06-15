@@ -13,11 +13,11 @@ export default async function OnboardingPage() {
 
     const { data: existing } = await supabase
       .from('user_profiles')
-      .select('id')
+      .select('onboarding_complete')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
 
-    if (existing) redirect('/dashboard')
+    if (existing?.onboarding_complete) redirect('/dashboard')
 
     const { data } = await supabase
       .from('members')

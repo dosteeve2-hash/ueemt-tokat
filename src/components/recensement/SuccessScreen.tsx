@@ -6,10 +6,9 @@ import { useState } from 'react'
 
 interface Props {
   formData: FormData
-  memberId: string
 }
 
-export default function SuccessScreen({ formData, memberId: _memberId }: Props) {
+export default function SuccessScreen({ formData }: Props) {
   const [downloading, setDownloading] = useState(false)
 
   const downloadAttestation = async () => {

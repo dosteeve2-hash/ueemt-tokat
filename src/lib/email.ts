@@ -66,7 +66,7 @@ export async function sendWelcomeEmail(
   nom: string,
 ): Promise<void> {
   if (!process.env.RESEND_API_KEY) {
-    console.log('[email] No RESEND_API_KEY — skipping welcome email for', to)
+    console.error('[email] No RESEND_API_KEY — welcome email skipped')
     return
   }
 
