@@ -10,9 +10,10 @@ type Step = 'liste' | 'password' | 'succes'
 
 interface Props {
   membres: Membre[]
+  loadError?: boolean
 }
 
-export default function PremiereConnexionClient({ membres }: Props) {
+export default function PremiereConnexionClient({ membres, loadError = false }: Props) {
   const router = useRouter()
 
   const [step, setStep] = useState<Step>('liste')
@@ -167,11 +168,26 @@ export default function PremiereConnexionClient({ membres }: Props) {
               />
             </div>
 
-            {membres.length === 0 ? (
+            {loadError ? (
+              <div className="text-center py-10">
+                <div className="text-4xl mb-3">⚠️</div>
+                <p className="font-semibold text-gray-700">Problème de connexion</p>
+                <p className="text-xs text-gray-400 mt-1 mb-4">
+                  Impossible de charger la liste. Réessaie dans quelques instants.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-full text-sm font-semibold"
+                >
+                  Réessayer
+                </button>
+              </div>
+            ) : membres.length === 0 ? (
               <div className="text-center py-10 text-gray-400 text-sm">
                 <div className="text-4xl mb-3">🔍</div>
-                <p className="font-medium text-gray-500">Liste non disponible</p>
-                <p className="text-xs mt-1">Contacte un administrateur UEEMT.</p>
+                <p className="font-medium text-gray-500">Aucun membre inscrit</p>
+                <p className="text-xs mt-1">Commence par te recenser, puis reviens ici.</p>
               </div>
             ) : filtered.length === 0 ? (
               <div className="text-center py-8 text-gray-400 text-sm">
