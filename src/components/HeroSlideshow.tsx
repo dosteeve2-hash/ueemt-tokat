@@ -112,10 +112,10 @@ export default function HeroSlideshow({ photos, title, subtitle, tagline }: Prop
 
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
           <Link
-            href="/recensement"
+            href="/connexion"
             className="bg-green-500 hover:bg-green-400 text-white px-8 py-4 rounded-xl font-bold text-base sm:text-lg transition-all hover:scale-105 shadow-lg inline-flex items-center justify-center min-h-[52px]"
           >
-            Se Recenser
+            Se connecter →
           </Link>
           <a
             href="https://www.instagram.com/ueemt.tokat"
@@ -126,6 +126,14 @@ export default function HeroSlideshow({ photos, title, subtitle, tagline }: Prop
             <InstagramIcon size={20} />
             @ueemt.tokat
           </a>
+        </div>
+        <div className="mt-4">
+          <Link
+            href="/recensement"
+            className="text-green-300 hover:text-white text-sm underline underline-offset-2 transition-colors"
+          >
+            Nouveau membre ? Se recenser →
+          </Link>
         </div>
       </div>
 
