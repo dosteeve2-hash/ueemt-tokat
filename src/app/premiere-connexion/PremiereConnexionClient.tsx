@@ -2,11 +2,11 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Mail, Lock, Eye, EyeOff, Search, CheckCircle, Loader2 } from 'lucide-react'
-import { verifierIdentite, creerCompteEtConnecter } from './actions'
+import { ArrowLeft, Lock, Eye, EyeOff, Search, CheckCircle, Loader2 } from 'lucide-react'
+import { creerCompteEtConnecter } from './actions'
 
 type Membre = { id: string; nom_complet: string; filiere: string | null }
-type Step = 'liste' | 'email' | 'password' | 'succes'
+type Step = 'liste' | 'password' | 'succes'
 
 interface Props {
   membres: Membre[]
@@ -18,7 +18,6 @@ export default function PremiereConnexionClient({ membres }: Props) {
   const [step, setStep] = useState<Step>('liste')
   const [query, setQuery] = useState('')
   const [selectedMembre, setSelectedMembre] = useState<Membre | null>(null)
-  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -61,17 +60,6 @@ export default function PremiereConnexionClient({ membres }: Props) {
   const handleSelectMembre = (m: Membre) => {
     setSelectedMembre(m)
     setError('')
-    setStep('email')
-  }
-
-  const handleVerifyEmail = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedMembre) return
-    setLoading(true)
-    setError('')
-    const { error: err } = await verifierIdentite(selectedMembre.id, email)
-    setLoading(false)
-    if (err) { setError(err); return }
     setStep('password')
   }
 
@@ -80,7 +68,7 @@ export default function PremiereConnexionClient({ membres }: Props) {
     if (!selectedMembre || !allCriteriaMet) return
     setLoading(true)
     setError('')
-    const { error: err } = await creerCompteEtConnecter(selectedMembre.id, email, password)
+    const { error: err } = await creerCompteEtConnecter(selectedMembre.id, password)
     setLoading(false)
     if (err) { setError(err); return }
     setStep('succes')
@@ -88,8 +76,7 @@ export default function PremiereConnexionClient({ membres }: Props) {
 
   const handleBack = () => {
     setError('')
-    if (step === 'email') { setStep('liste'); return }
-    if (step === 'password') { setStep('email'); return }
+    if (step === 'password') { setStep('liste'); return }
     router.push('/connexion')
   }
 
@@ -110,13 +97,11 @@ export default function PremiereConnexionClient({ membres }: Props) {
           </div>
           <h1 className="text-2xl font-bold text-gray-900">
             {step === 'liste' && 'Qui es-tu ?'}
-            {step === 'email' && 'Confirme ton email'}
             {step === 'password' && 'Crée ton mot de passe'}
             {step === 'succes' && 'Compte créé !'}
           </h1>
           <p className="text-gray-500 text-sm mt-1.5">
             {step === 'liste' && 'Sélectionne ton nom dans la liste'}
-            {step === 'email' && "Entre l'adresse avec laquelle tu t'es inscrit(e)"}
             {step === 'password' && 'Choisis un mot de passe sécurisé'}
             {step === 'succes' && 'Tu vas être redirigé(e) vers le fil...'}
           </p>
@@ -125,22 +110,22 @@ export default function PremiereConnexionClient({ membres }: Props) {
         {/* Indicateur d'étapes */}
         {step !== 'succes' && (
           <div className="flex items-center gap-2 mb-6">
-            {(['liste', 'email', 'password'] as Step[]).map((s, i) => (
+            {(['liste', 'password'] as Step[]).map((s, i) => (
               <div key={s} className="flex items-center gap-2 flex-1">
                 <div
                   className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
                     step === s
                       ? 'bg-green-600 text-white'
-                      : ['email', 'password'].indexOf(step) > ['email', 'password'].indexOf(s)
+                      : step === 'password' && s === 'liste'
                         ? 'bg-green-100 text-green-700'
                         : 'bg-gray-100 text-gray-400'
                   }`}
                 >
                   {i + 1}
                 </div>
-                {i < 2 && (
+                {i < 1 && (
                   <div className={`flex-1 h-px transition-colors ${
-                    ['email', 'password'].indexOf(step) > i ? 'bg-green-300' : 'bg-gray-100'
+                    step === 'password' ? 'bg-green-300' : 'bg-gray-100'
                   }`} />
                 )}
               </div>
@@ -214,57 +199,15 @@ export default function PremiereConnexionClient({ membres }: Props) {
           </div>
         )}
 
-        {/* ── Étape 2 — Email ── */}
-        {step === 'email' && selectedMembre && (
-          <form onSubmit={handleVerifyEmail} className="space-y-4">
+        {/* ── Étape 2 — Mot de passe ── */}
+        {step === 'password' && selectedMembre && (
+          <form onSubmit={handleCreatePassword} className="space-y-4">
             <div className="bg-green-50 border border-green-100 rounded-xl p-3">
               <p className="text-xs text-gray-400 mb-0.5">Membre sélectionné</p>
               <p className="font-bold text-gray-900 text-sm">{selectedMembre.nom_complet}</p>
               {selectedMembre.filiere && (
                 <p className="text-gray-500 text-xs mt-0.5">{selectedMembre.filiere}</p>
               )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Adresse email
-              </label>
-              <div className="relative">
-                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl pl-9 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
-                  placeholder="votre@email.com"
-                  autoComplete="email"
-                  autoFocus
-                  required
-                />
-              </div>
-              <p className="text-gray-400 text-xs mt-1.5">
-                L&apos;email avec lequel tu t&apos;es inscrit(e) auprès de l&apos;UEEMT.
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading || !email.trim()}
-              className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-colors min-h-[48px] flex items-center justify-center gap-2"
-            >
-              {loading && <Loader2 size={16} className="animate-spin" />}
-              {loading ? 'Vérification...' : 'Confirmer →'}
-            </button>
-          </form>
-        )}
-
-        {/* ── Étape 3 — Mot de passe ── */}
-        {step === 'password' && selectedMembre && (
-          <form onSubmit={handleCreatePassword} className="space-y-4">
-            <div className="bg-green-50 border border-green-100 rounded-xl p-3">
-              <p className="text-xs text-gray-400 mb-0.5">Compte</p>
-              <p className="font-bold text-gray-900 text-sm">{selectedMembre.nom_complet}</p>
-              <p className="text-gray-500 text-xs mt-0.5">{email}</p>
             </div>
 
             {/* Mot de passe */}
@@ -352,7 +295,7 @@ export default function PremiereConnexionClient({ membres }: Props) {
           </form>
         )}
 
-        {/* ── Étape 4 — Succès ── */}
+        {/* ── Étape 3 — Succès ── */}
         {step === 'succes' && (
           <div className="text-center space-y-4 py-4">
             <div className="text-5xl">🎉</div>

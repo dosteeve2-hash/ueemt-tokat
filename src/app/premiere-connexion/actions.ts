@@ -7,28 +7,13 @@ const stripBom = (s: string | undefined) => (s ?? '').replace(/^﻿/, '').trim()
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
 
-const verifyRateLimitMap = new Map<string, { count: number; resetAt: number }>()
 const createRateLimitMap = new Map<string, { count: number; resetAt: number }>()
 
-function checkVerifyRateLimit(email: string): boolean {
-  const key = email.toLowerCase()
+function checkCreateRateLimit(memberId: string): boolean {
   const now = Date.now()
-  const entry = verifyRateLimitMap.get(key)
+  const entry = createRateLimitMap.get(memberId)
   if (!entry || now > entry.resetAt) {
-    verifyRateLimitMap.set(key, { count: 1, resetAt: now + 600_000 }) // 10 min
-    return true
-  }
-  if (entry.count >= 5) return false
-  entry.count++
-  return true
-}
-
-function checkCreateRateLimit(email: string): boolean {
-  const key = email.toLowerCase()
-  const now = Date.now()
-  const entry = createRateLimitMap.get(key)
-  if (!entry || now > entry.resetAt) {
-    createRateLimitMap.set(key, { count: 1, resetAt: now + 3_600_000 }) // 1h
+    createRateLimitMap.set(memberId, { count: 1, resetAt: now + 3_600_000 }) // 1h
     return true
   }
   if (entry.count >= 3) return false
@@ -36,61 +21,19 @@ function checkCreateRateLimit(email: string): boolean {
   return true
 }
 
-// ─── verifierIdentite ─────────────────────────────────────────────────────────
-
-export async function verifierIdentite(
-  memberId: string,
-  email: string,
-): Promise<{ error: string | null }> {
-  const normalizedEmail = email.trim().toLowerCase().replace(/^﻿/, '')
-
-  if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-    return { error: 'Adresse email invalide.' }
-  }
-  if (!checkVerifyRateLimit(normalizedEmail)) {
-    return { error: 'Trop de tentatives. Réessaie dans 10 minutes.' }
-  }
-
-  const serviceKey = stripBom(process.env.SUPABASE_SERVICE_ROLE_KEY)
-  const supabaseUrl = stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL)
-  const hasValidServiceKey = serviceKey.startsWith('eyJ')
-
-  const client = hasValidServiceKey
-    ? createAdminClient(supabaseUrl, serviceKey, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      })
-    : await createSupabaseServerClient()
-
-  const { data: member } = await client
-    .from('members')
-    .select('id')
-    .eq('id', memberId)
-    .eq('email', normalizedEmail)
-    .eq('is_active', true)
-    .maybeSingle()
-
-  if (!member) {
-    return { error: "Cet email ne correspond pas à ce membre. Vérifie ton adresse email." }
-  }
-  return { error: null }
-}
-
 // ─── creerCompteEtConnecter ───────────────────────────────────────────────────
 
 export async function creerCompteEtConnecter(
   memberId: string,
-  email: string,
   password: string,
 ): Promise<{ error: string | null }> {
-  const normalizedEmail = email.trim().toLowerCase().replace(/^﻿/, '')
-
-  if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-    return { error: 'Adresse email invalide.' }
+  if (!memberId) {
+    return { error: 'Membre non sélectionné.' }
   }
   if (!password || password.length < 8) {
     return { error: 'Le mot de passe doit contenir au moins 8 caractères.' }
   }
-  if (!checkCreateRateLimit(normalizedEmail)) {
+  if (!checkCreateRateLimit(memberId)) {
     return { error: 'Trop de tentatives. Réessaie dans 1 heure.' }
   }
 
@@ -106,18 +49,19 @@ export async function creerCompteEtConnecter(
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  // Re-vérification sécurité : email + memberId + is_active
-  const { data: member } = await admin
+  // Récupérer l'email depuis la DB — le client ne l'envoie plus
+  const { data: member, error: fetchError } = await admin
     .from('members')
-    .select('id')
+    .select('email')
     .eq('id', memberId)
-    .eq('email', normalizedEmail)
     .eq('is_active', true)
-    .maybeSingle()
+    .single()
 
-  if (!member) {
-    return { error: "Cet email ne correspond pas à ce membre." }
+  if (fetchError || !member?.email) {
+    return { error: 'Membre introuvable ou compte désactivé. Contacte un administrateur.' }
   }
+
+  const normalizedEmail = (member.email as string).trim().toLowerCase()
 
   // Tentative de création — si le compte existe déjà, on met à jour le mot de passe
   const { error: createError } = await admin.auth.admin.createUser({
