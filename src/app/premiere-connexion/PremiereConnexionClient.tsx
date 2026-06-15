@@ -96,12 +96,12 @@ export default function PremiereConnexionClient({ membres }: Props) {
             )}
           </div>
           <h1 className="text-2xl font-bold text-gray-900">
-            {step === 'liste' && 'Qui es-tu ?'}
-            {step === 'password' && 'Crée ton mot de passe'}
+            {step === 'liste' && 'Créer mon compte'}
+            {step === 'password' && 'Créer mon compte'}
             {step === 'succes' && 'Compte créé !'}
           </h1>
           <p className="text-gray-500 text-sm mt-1.5">
-            {step === 'liste' && 'Sélectionne ton nom dans la liste'}
+            {step === 'liste' && 'Tu es déjà recensé ? Choisis ton nom et crée ton mot de passe.'}
             {step === 'password' && 'Choisis un mot de passe sécurisé'}
             {step === 'succes' && 'Tu vas être redirigé(e) vers le fil...'}
           </p>
@@ -169,9 +169,9 @@ export default function PremiereConnexionClient({ membres }: Props) {
 
             {membres.length === 0 ? (
               <div className="text-center py-10 text-gray-400 text-sm">
-                <div className="text-4xl mb-3">😕</div>
-                <p className="font-medium text-gray-500">Aucun membre chargé</p>
-                <p className="text-xs mt-1">Contacte un administrateur.</p>
+                <div className="text-4xl mb-3">🔍</div>
+                <p className="font-medium text-gray-500">Liste non disponible</p>
+                <p className="text-xs mt-1">Contacte un administrateur UEEMT.</p>
               </div>
             ) : filtered.length === 0 ? (
               <div className="text-center py-8 text-gray-400 text-sm">

@@ -240,14 +240,21 @@ export async function getMembresList(): Promise<{
 
     const { data, error } = await client
       .from('members')
-      .select('id, nom_complet, filiere')
-      .order('nom_complet')
+      .select('id, prenom, nom, filiere')
+      .order('nom')
 
     if (error) {
       console.error('[getMembresList]', error)
       return { membres: [], error: error.message }
     }
-    return { membres: (data ?? []) as Array<{ id: string; nom_complet: string; filiere: string | null }>, error: null }
+    return {
+      membres: (data ?? []).map((m) => ({
+        id: m.id as string,
+        nom_complet: `${(m.prenom as string) ?? ''} ${(m.nom as string) ?? ''}`.trim(),
+        filiere: m.filiere as string | null,
+      })),
+      error: null,
+    }
   } catch (e) {
     return { membres: [], error: String(e) }
   }

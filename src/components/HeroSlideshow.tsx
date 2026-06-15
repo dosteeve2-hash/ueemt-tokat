@@ -137,16 +137,38 @@ export default function HeroSlideshow({ photos, title, subtitle, tagline }: Prop
         </div>
       </div>
 
+      {/* Prev / Next arrows */}
+      {photos.length > 1 && (
+        <>
+          <button
+            onClick={() => setCurrent((c) => (c - 1 + photos.length) % photos.length)}
+            aria-label="Slide précédent"
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-10 w-11 h-11 rounded-full bg-black/30 hover:bg-black/50 border border-white/20 text-white flex items-center justify-center transition-all backdrop-blur-sm"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <button
+            onClick={() => setCurrent((c) => (c + 1) % photos.length)}
+            aria-label="Slide suivant"
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-10 w-11 h-11 rounded-full bg-black/30 hover:bg-black/50 border border-white/20 text-white flex items-center justify-center transition-all backdrop-blur-sm"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </>
+      )}
+
       {/* Slide dots */}
       {photos.length > 1 && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 flex gap-2.5 z-10">
           {photos.map((_, i) => (
             <button
               key={i}
               onClick={() => setCurrent(i)}
               aria-label={`Slide ${i + 1}`}
-              className={`rounded-full transition-all duration-300 ${
-                i === current ? 'w-6 h-2 bg-white' : 'w-2 h-2 bg-white/40 hover:bg-white/60'
+              className={`rounded-full transition-all duration-300 shadow-md ${
+                i === current
+                  ? 'w-8 h-3 bg-white shadow-white/30'
+                  : 'w-3 h-3 bg-white/50 hover:bg-white/80'
               }`}
             />
           ))}

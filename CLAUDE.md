@@ -359,4 +359,55 @@ const m = useModal()
 
 ---
 
-*Maintenu par Steve Donald Compaoré — dernière mise à jour : 2026-06-14*
+## Maintenance quotidienne — Règle permanente
+
+Claude doit effectuer une maintenance proactive quotidienne de ce projet. À chaque session de maintenance :
+
+### Checklist obligatoire
+
+1. **Vercel** — Vérifier que le dernier déploiement est "READY" (pas d'erreur de build)
+2. **Logs runtime** — Scanner les logs Vercel des dernières 24h pour erreurs 5xx, crashes, erreurs TypeScript runtime
+3. **Sentry** — Vérifier les nouvelles issues Sentry depuis la dernière maintenance
+4. **Build local** — Lancer `npm run build` → doit passer sans erreur ni warning TypeScript
+5. **Tests** — Lancer `npm run test` (Vitest) → 24 tests doivent passer
+6. **Dépendances** — Lancer `npm audit` → signaler toute vulnérabilité HIGH ou CRITICAL
+7. **Supabase** — Vérifier les advisors Supabase (index manquants, RLS non activé, etc.)
+
+### Actions proactives
+
+Si Claude identifie pendant la maintenance :
+- Une erreur ou bug → le corriger directement, commit + push
+- Une vulnérabilité → évaluer et corriger si safe, sinon signaler
+- Une opportunité d'optimisation (perf, UX, sécurité) → l'intégrer si < 30min de travail
+- Une dépendance obsolète avec breaking changes → signaler sans auto-upgrade
+- Un pattern répété dans les logs (ex: erreur auth spécifique) → diagnostiquer et corriger
+
+### Format du rapport de maintenance
+
+Après chaque maintenance, produire un rapport structuré :
+```
+## Rapport maintenance UEEMT — [DATE]
+
+### ✅ Checks passés
+- [liste]
+
+### ⚠️ Points d'attention
+- [liste ou "aucun"]
+
+### 🔧 Corrections appliquées
+- [liste des commits ou "aucune"]
+
+### 💡 Suggestions pour la prochaine session
+- [liste ou "aucune"]
+```
+
+### Contraintes
+
+- Ne jamais modifier les variables d'environnement Supabase ou Vercel sans validation explicite de Steve
+- Ne jamais supprimer de données en production
+- Toujours faire un `npm run build` avant de pusher
+- Committer chaque correction séparément avec un message clair
+
+---
+
+*Maintenu par Steve Donald Compaoré — dernière mise à jour : 2026-06-15*

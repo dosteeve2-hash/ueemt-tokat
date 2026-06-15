@@ -1,7 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Bell, BellOff } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+
+const PUSH_ASKED_KEY = 'push_asked'
+const AUTO_PROMPT_DELAY_MS = 3000
 
 function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -15,6 +19,7 @@ export default function PushNotificationSetup() {
   const [permission, setPermission] = useState<NotificationPermission>('default')
   const [subscribed, setSubscribed] = useState(false)
   const [loading, setLoading] = useState(false)
+  const autoPromptedRef = useRef(false)
 
   useEffect(() => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
@@ -26,6 +31,50 @@ export default function PushNotificationSetup() {
       setSubscribed(!!sub)
     })
   }, [])
+
+  // Auto-prompt after login if not yet asked and permission is default
+  useEffect(() => {
+    if (!supported) return
+    if (Notification.permission !== 'default') return
+    if (typeof localStorage !== 'undefined' && localStorage.getItem(PUSH_ASKED_KEY)) return
+    if (autoPromptedRef.current) return
+
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      // User is logged in and permission not yet asked — prompt after delay
+      const timer = setTimeout(async () => {
+        if (autoPromptedRef.current) return
+        autoPromptedRef.current = true
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(PUSH_ASKED_KEY, 'true')
+        }
+        try {
+          const perm = await Notification.requestPermission()
+          setPermission(perm)
+          if (perm !== 'granted') return
+          // Auto-subscribe
+          const reg = await navigator.serviceWorker.ready
+          const sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(
+              process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ''
+            ),
+          })
+          await fetch('/api/push/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(sub.toJSON()),
+          })
+          setSubscribed(true)
+        } catch {
+          // Ignore — user may have dismissed or browser blocked
+        }
+      }, AUTO_PROMPT_DELAY_MS)
+
+      return () => clearTimeout(timer)
+    }).catch(() => {})
+  }, [supported])
 
   const subscribe = async () => {
     setLoading(true)

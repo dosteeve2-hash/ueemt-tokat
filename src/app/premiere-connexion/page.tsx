@@ -20,14 +20,18 @@ export default async function PremiereConnexionPage() {
 
     const { data, error } = await admin
       .from('members')
-      .select('id, nom_complet, filiere')
+      .select('id, prenom, nom, filiere')
       .eq('is_active', true)
-      .order('nom_complet')
+      .order('nom')
 
     if (error) {
       console.error('[premiere-connexion] erreur chargement membres:', error)
     } else {
-      membres = (data ?? []) as Array<{ id: string; nom_complet: string; filiere: string | null }>
+      membres = (data ?? []).map((m) => ({
+        id: m.id as string,
+        nom_complet: `${(m.prenom as string) ?? ''} ${(m.nom as string) ?? ''}`.trim(),
+        filiere: m.filiere as string | null,
+      }))
     }
   }
 
