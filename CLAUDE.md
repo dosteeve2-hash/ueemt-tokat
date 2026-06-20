@@ -151,6 +151,32 @@ Pour publier sur App Store sans Mac :
 
 ---
 
+## Stratégie de branches Git
+
+- `main` = production (ce que les membres voient). **Ne jamais pusher directement des features sur main.**
+- `dev` = branche de développement. Toutes les nouvelles fonctionnalités partent de `dev`.
+- Vercel crée une **preview URL** automatique pour chaque branche → tester sur `dev.preview` avant de merger.
+
+### Workflow obligatoire pour chaque feature
+
+```
+git checkout dev                  # toujours partir de dev
+git pull origin dev               # récupérer les dernières modifs
+# ... développement ...
+npm run build                     # 0 erreur TypeScript
+npm test                          # 24 tests passent
+git commit -m "feat: ..."
+git push origin dev               # → Vercel preview URL
+# Tester sur la preview URL
+git checkout main
+git merge dev --no-ff
+git push origin main              # → Déploiement production
+```
+
+**Jamais** : `git push origin main` directement depuis une branche feature.
+
+---
+
 ## Workflow pré-PR obligatoire
 
 Avant tout PR ou mise en production :
@@ -502,6 +528,63 @@ CREATE TABLE listings (
 - Utiliser le `design:design-critique` skill pour auditer chaque nouvelle page
 - Utiliser le `design:accessibility-review` skill avant chaque PR (WCAG 2.1 AA)
 - Palette dark mode à affiner pour le marketplace
+
+---
+
+---
+
+## Fonctionnalités communautaires — Clubs & Centres d'intérêt (P8)
+
+**Objectif** : rendre le site inclusif pour tous les profils de membres — sportifs, artistes, entrepreneurs, geeks, cuisiniers, etc.
+
+### Concept : Clubs thématiques
+
+Chaque membre peut rejoindre un ou plusieurs clubs. Les posts peuvent être tagués par club. Le feed peut être filtré.
+
+**Clubs prévus** :
+- ⚽ Foot — lié au système événements/matchs déjà en place
+- 🏀 Basket — tournois, scores, compositions
+- 🍳 Cuisine — recettes, soirées culinaires, photos de plats
+- 🎨 Arts / Ciné / Séries — recommandations, sorties, discussions
+- 📚 Mangas / Lecture / BD — clubs de lecture, échanges
+- 💼 Business / Entrepreneuriat — lié au Marketplace (P6)
+- 🌍 Divers — pour membres d'origines mixtes, amis internationaux
+
+### Architecture cible
+
+```sql
+-- Table clubs
+CREATE TABLE clubs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug text UNIQUE NOT NULL,        -- 'foot', 'basket', 'cuisine'...
+  name text NOT NULL,
+  emoji text,
+  description text,
+  created_at timestamptz DEFAULT now()
+);
+
+-- Appartenance membre → club
+CREATE TABLE club_members (
+  club_id uuid REFERENCES clubs(id) ON DELETE CASCADE,
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  joined_at timestamptz DEFAULT now(),
+  PRIMARY KEY (club_id, user_id)
+);
+
+-- Tag sur les posts feed
+ALTER TABLE feed_posts ADD COLUMN club_id uuid REFERENCES clubs(id);
+```
+
+**Pages** :
+- `/clubs` — liste des clubs, rejoindre/quitter
+- `/clubs/[slug]` — feed filtré par club
+- Dashboard → tab "Mes clubs"
+- Feed → filtre par club dans la barre de recherche
+
+**UX** :
+- Badge club sur les posts
+- Notification quand un post est publié dans un club dont on est membre
+- Nombre de membres par club visible
 
 ---
 
