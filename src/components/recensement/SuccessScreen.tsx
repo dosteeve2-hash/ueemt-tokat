@@ -1,6 +1,7 @@
 'use client'
 
-import { CheckCircle, Download } from 'lucide-react'
+import { CheckCircle, Download, ArrowRight } from 'lucide-react'
+import Link from 'next/link'
 import type { FormData } from '@/app/recensement/page'
 import { useState } from 'react'
 
@@ -42,28 +43,43 @@ export default function SuccessScreen({ formData }: Props) {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 text-center">
-      <CheckCircle size={64} className="text-green-500 mx-auto mb-6" />
-      <h2 className="text-2xl font-black text-gray-900 mb-3">Inscription réussie !</h2>
-      <p className="text-gray-600 mb-2">
-        Bienvenue <strong>{formData.prenom} {formData.nom}</strong> dans la famille UEEMT-Tokat !
-      </p>
-      <p className="text-gray-500 text-sm mb-8">
-        Votre inscription est en attente de validation par l'administration. Vous serez contacté(e) prochainement.
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 sm:p-10 text-center">
+      <div className="text-5xl mb-4">🎉</div>
+      <h2 className="text-2xl font-black text-gray-900 mb-3">Tu es dans la famille !</h2>
+      <p className="text-gray-600 mb-6">
+        Bienvenue <strong>{formData.prenom} {formData.nom}</strong> dans l&apos;UEEMT-Tokat !
+        Ton recensement est bien enregistré.
       </p>
 
-      <div className="bg-green-50 rounded-xl p-4 mb-8 text-sm text-green-800">
-        <p className="font-semibold">Cotisation : 50 TL</p>
-        <p className="text-green-700 mt-1">Contactez l'équipe sur Instagram pour régler votre cotisation.</p>
+      {/* Étape suivante — immédiate, pas d'admin requis */}
+      <div className="bg-green-50 border border-green-200 rounded-2xl p-5 mb-6 text-left">
+        <p className="font-bold text-green-800 text-sm mb-1">✅ Étape suivante — Crée ton compte maintenant</p>
+        <p className="text-green-700 text-sm mb-4">
+          Tu peux accéder à l&apos;espace membre immédiatement. Choisis ton nom dans la liste et définis ton mot de passe.
+        </p>
+        <Link
+          href="/premiere-connexion"
+          className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-bold transition-colors text-sm"
+        >
+          Créer mon compte maintenant
+          <ArrowRight size={16} />
+        </Link>
       </div>
 
+      {/* Cotisation */}
+      <div className="bg-amber-50 rounded-xl p-4 mb-6 text-sm text-amber-800">
+        <p className="font-semibold">Cotisation annuelle : 50 TL</p>
+        <p className="text-amber-700 mt-1">À régler auprès du bureau de l&apos;association.</p>
+      </div>
+
+      {/* Attestation */}
       <button
         onClick={downloadAttestation}
         disabled={downloading}
-        className="flex items-center justify-center gap-3 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white px-8 py-4 rounded-xl font-bold mx-auto transition-colors"
+        className="flex items-center justify-center gap-3 border-2 border-gray-200 hover:border-green-400 hover:bg-green-50 text-gray-700 hover:text-green-700 px-8 py-3.5 rounded-xl font-semibold mx-auto transition-all text-sm disabled:opacity-60"
       >
-        <Download size={20} />
-        {downloading ? 'Génération...' : 'Télécharger mon attestation provisoire'}
+        <Download size={16} />
+        {downloading ? 'Génération...' : 'Télécharger l\'attestation provisoire'}
       </button>
     </div>
   )

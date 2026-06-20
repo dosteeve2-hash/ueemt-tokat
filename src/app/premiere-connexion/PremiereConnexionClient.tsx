@@ -245,8 +245,19 @@ export default function PremiereConnexionClient() {
                 </a>
               </div>
             ) : filtered.length === 0 ? (
-              <div className="text-center py-8 text-gray-400 text-sm">
-                Aucun résultat pour &quot;{query}&quot;
+              <div className="text-center py-8 space-y-3">
+                <div className="text-3xl">🔍</div>
+                <p className="text-gray-700 font-semibold text-sm">Aucun résultat pour &quot;{query}&quot;</p>
+                <p className="text-gray-400 text-xs max-w-xs mx-auto">
+                  Essaie avec ton prénom ou ton nom seul. Si tu n&apos;es pas encore recensé(e),
+                  remplis d&apos;abord le formulaire ci-dessous.
+                </p>
+                <a
+                  href="/recensement"
+                  className="inline-block bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-full text-xs font-semibold transition-colors"
+                >
+                  Se recenser d&apos;abord →
+                </a>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-0.5">
@@ -370,12 +381,13 @@ export default function PremiereConnexionClient() {
         {step === 'succes' && (
           <div className="text-center space-y-4 py-4">
             <div className="text-5xl">🎉</div>
-            <p className="text-gray-700 font-semibold">
+            <p className="text-gray-900 font-black text-lg">
               Bienvenue, {selectedMembre?.nom_complet?.split(' ')[0]} !
             </p>
-            <p className="text-gray-500 text-sm">
-              Ton compte a été créé. Redirection en cours...
+            <p className="text-green-600 font-semibold text-sm">
+              Ton compte est activé. Tu fais partie de la famille UEEMT-Tokat !
             </p>
+            <p className="text-gray-400 text-xs">Redirection vers le fil d&apos;actualité...</p>
             <Loader2 size={22} className="animate-spin text-green-600 mx-auto" />
           </div>
         )}
