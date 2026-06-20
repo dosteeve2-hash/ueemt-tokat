@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Camera, Save, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react'
 import { updateProfile, updateAvatarUrl } from '@/app/profil/actions'
 import { createClient } from '@/lib/supabase/client'
+import { broadcastSocialEvent } from '@/lib/broadcast'
 
 interface Profile {
   id: string
@@ -122,10 +123,21 @@ export default function ProfilClient({ profile, member, userId }: Props) {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
+    const wasProfileEmpty = !profile?.bio
     startTransition(async () => {
       await updateProfile(fd)
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
+
+      // Broadcast "profile completed" when bio is set for the first time
+      const newBio = (fd.get('bio') as string | null)?.trim() ?? ''
+      if (wasProfileEmpty && newBio.length > 0 && member) {
+        void broadcastSocialEvent('profile_completed', {
+          userId,
+          prenom: member.prenom,
+          avatarUrl: avatarUrl || null,
+        })
+      }
     })
   }
 

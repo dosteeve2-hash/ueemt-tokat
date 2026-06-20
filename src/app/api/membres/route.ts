@@ -8,7 +8,6 @@ export async function GET() {
     const { data, error } = await supabase
       .from('members')
       .select('id, prenom, nom, filiere')
-      .eq('is_active', true)
       .order('nom')
 
     if (error) {

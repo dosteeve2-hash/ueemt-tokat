@@ -285,7 +285,6 @@ export async function verifierIdentite(
     .select('id')
     .eq('id', memberId)
     .eq('email', normalizedEmail)
-    .eq('is_active', true)
     .maybeSingle()
 
   if (!member) {
@@ -326,7 +325,6 @@ export async function creerMotDePasseEtConnecter(
     .select('id')
     .eq('id', memberId)
     .eq('email', normalizedEmail)
-    .eq('is_active', true)
     .maybeSingle()
 
   if (!member) {

@@ -25,10 +25,15 @@ function checkCreateRateLimit(memberId: string): boolean {
 
 export async function creerCompteEtConnecter(
   memberId: string,
+  emailInput: string,
   password: string,
 ): Promise<{ error: string | null }> {
   if (!memberId) {
     return { error: 'Membre non sélectionné.' }
+  }
+  const rawEmail = emailInput?.trim().toLowerCase() ?? ''
+  if (!rawEmail || !rawEmail.includes('@')) {
+    return { error: 'Adresse email invalide.' }
   }
   if (!password || password.length < 8) {
     return { error: 'Le mot de passe doit contenir au moins 8 caractères.' }
@@ -49,19 +54,29 @@ export async function creerCompteEtConnecter(
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  // Récupérer l'email depuis la DB — le client ne l'envoie plus
+  // Vérifier que le membre existe (sans filtre is_active — tous les membres recensés peuvent créer un compte)
   const { data: member, error: fetchError } = await admin
     .from('members')
-    .select('email')
+    .select('id, email, is_active')
     .eq('id', memberId)
-    .eq('is_active', true)
     .single()
 
-  if (fetchError || !member?.email) {
-    return { error: 'Membre introuvable ou compte désactivé. Vérifie que tu es bien recensé(e) sur /recensement.' }
+  if (fetchError || !member) {
+    return { error: 'Membre introuvable. Vérifie que tu es bien recensé(e) sur /recensement.' }
   }
 
-  const normalizedEmail = (member.email as string).trim().toLowerCase()
+  // Activer le membre s'il ne l'est pas encore
+  if (!member.is_active) {
+    await admin.from('members').update({ is_active: true }).eq('id', memberId)
+  }
+
+  // Sauvegarder l'email dans members si absent ou différent
+  const storedEmail = (member.email as string | null)?.trim().toLowerCase() ?? null
+  if (!storedEmail || storedEmail !== rawEmail) {
+    await admin.from('members').update({ email: rawEmail }).eq('id', memberId)
+  }
+
+  const normalizedEmail = rawEmail
 
   // Tentative de création — si le compte existe déjà, on met à jour le mot de passe
   const { error: createError } = await admin.auth.admin.createUser({

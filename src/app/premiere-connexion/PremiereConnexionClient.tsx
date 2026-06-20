@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Lock, Eye, EyeOff, Search, CheckCircle, Loader2 } from 'lucide-react'
+import { ArrowLeft, Lock, Eye, EyeOff, Search, CheckCircle, Loader2, Mail } from 'lucide-react'
 import { creerCompteEtConnecter } from './actions'
 
 type Membre = { id: string; nom_complet: string; filiere: string | null }
@@ -19,6 +19,7 @@ export default function PremiereConnexionClient() {
   const [step, setStep] = useState<Step>('liste')
   const [query, setQuery] = useState('')
   const [selectedMembre, setSelectedMembre] = useState<Membre | null>(null)
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -75,13 +76,15 @@ export default function PremiereConnexionClient() {
 
   // ─── Critères mot de passe ────────────────────────────────────────────────
 
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+
   const criteria = [
     { label: 'Au moins 8 caractères', met: password.length >= 8 },
     { label: 'Une majuscule', met: /[A-Z]/.test(password) },
     { label: 'Un chiffre', met: /[0-9]/.test(password) },
     { label: 'Les mots de passe correspondent', met: password.length > 0 && password === confirmPassword },
   ]
-  const allCriteriaMet = criteria.every((c) => c.met)
+  const allCriteriaMet = emailValid && criteria.every((c) => c.met)
 
   // ─── Handlers ────────────────────────────────────────────────────────────
 
@@ -96,7 +99,7 @@ export default function PremiereConnexionClient() {
     if (!selectedMembre || !allCriteriaMet) return
     setLoading(true)
     setError('')
-    const { error: err } = await creerCompteEtConnecter(selectedMembre.id, password)
+    const { error: err } = await creerCompteEtConnecter(selectedMembre.id, email.trim(), password)
     setLoading(false)
     if (err) { setError(err); return }
     setStep('succes')
@@ -292,6 +295,30 @@ export default function PremiereConnexionClient() {
               )}
             </div>
 
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Ton adresse email
+              </label>
+              <div className="relative">
+                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={`w-full border rounded-xl pl-9 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm transition-colors ${
+                    email && !emailValid ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                  }`}
+                  placeholder="ton.email@example.com"
+                  autoComplete="email"
+                  autoFocus
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                Utilisé pour te connecter et recevoir les notifications
+              </p>
+            </div>
+
             {/* Mot de passe */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -306,7 +333,6 @@ export default function PremiereConnexionClient() {
                   className="w-full border border-gray-200 rounded-xl pl-9 pr-10 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
                   placeholder="••••••••"
                   autoComplete="new-password"
-                  autoFocus
                 />
                 <button
                   type="button"
