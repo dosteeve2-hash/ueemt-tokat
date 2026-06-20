@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import Image from 'next/image'
+import { redirect } from 'next/navigation'
 import { Users, MapPin, Calendar, Award } from 'lucide-react'
 import { BUREAU_MEMBERS } from '@/lib/constants'
 import HeroSlideshow from '@/components/HeroSlideshow'
@@ -29,6 +30,8 @@ export default async function HomePage() {
       supabase.auth.getUser(),
     ])
     isLoggedIn = !!user
+    // Membres connectés → directement vers le fil d'actualité
+    if (user) redirect('/feed')
     if (settings) {
       const map = Object.fromEntries(settings.map((r) => [r.key, r.value ?? '']))
       if (map.hero_title) heroTitle = map.hero_title

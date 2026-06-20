@@ -16,7 +16,7 @@ export default async function AdminDashboardPage() {
       .single()
 
     if (!rawProfile) redirect('/onboarding')
-    if (rawProfile.role !== 'admin') redirect('/dashboard')
+    if (rawProfile.role !== 'admin' && rawProfile.role !== 'president') redirect('/dashboard')
 
     const memberData = Array.isArray(rawProfile.member) ? rawProfile.member[0] ?? null : rawProfile.member as { prenom: string; nom: string } | null
     const profile = { role: rawProfile.role as string, member: memberData }

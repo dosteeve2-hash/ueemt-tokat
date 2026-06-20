@@ -49,7 +49,7 @@ function ConnexionContent() {
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser()
-      .then(({ data: { user } }) => { if (user) router.replace('/dashboard') })
+      .then(({ data: { user } }) => { if (user) router.replace('/feed') })
       .catch(() => {})
   }, [router])
 

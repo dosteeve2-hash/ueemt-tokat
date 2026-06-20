@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { isBureauMember } from '@/lib/constants'
+import { getAppRole } from '@/lib/constants'
 import { sendWelcomeEmail } from '@/lib/email'
 
 export async function POST(req: NextRequest) {
@@ -18,7 +18,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Données manquantes.' }, { status: 400 })
     }
 
-    const role = isBureauMember(prenom, nom) ? 'admin' : 'member'
+    // 'president' | 'admin' | 'member'
+    const role = getAppRole(prenom, nom)
+
+    // Vérifier si ce member_id est déjà lié à un autre profil (contrainte UNIQUE)
+    const { data: existing } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('member_id', memberId)
+      .maybeSingle()
+
+    if (existing && existing.id !== user.id) {
+      // member_id déjà pris par un autre compte — mise à jour du profil existant
+      await supabase
+        .from('user_profiles')
+        .update({ role, onboarding_complete: true })
+        .eq('id', existing.id)
+      return NextResponse.json({ ok: true, role })
+    }
 
     const { error } = await supabase.from('user_profiles').upsert({
       id: user.id,
@@ -29,7 +46,8 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       if (error.code === '23505') {
-        return NextResponse.json({ error: 'Profil déjà configuré.' }, { status: 409 })
+        // Conflit UNIQUE sur member_id — profil déjà configuré, on retourne ok
+        return NextResponse.json({ ok: true, role })
       }
       return NextResponse.json({ error: error.message }, { status: 500 })
     }

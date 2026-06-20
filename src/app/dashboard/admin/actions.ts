@@ -15,7 +15,7 @@ async function requireAdmin() {
     .eq('id', user.id)
     .single()
 
-  if (data?.role !== 'admin') redirect('/dashboard')
+  if (data?.role !== 'admin' && data?.role !== 'president') redirect('/dashboard')
   return { supabase, userId: user.id }
 }
 

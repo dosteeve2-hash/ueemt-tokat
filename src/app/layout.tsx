@@ -87,7 +87,7 @@ export default function RootLayout({
           <LanguageProvider>
             <ServiceWorkerRegistration />
             <Navbar />
-            <main>{children}</main>
+            <main className="pb-16 md:pb-0">{children}</main>
             <PushNotificationSetup />
             <Footer />
             <Toaster

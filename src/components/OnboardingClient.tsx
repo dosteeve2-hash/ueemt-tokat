@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { isBureauMember } from '@/lib/constants'
+import { isBureauMember, isPresident } from '@/lib/constants'
 
 interface Member {
   id: string
@@ -73,9 +73,14 @@ export default function OnboardingClient({ members }: Props) {
               </div>
               <p className="font-bold text-gray-900 text-lg">{selected.prenom} {selected.nom}</p>
               {selected.filiere && <p className="text-gray-500 text-sm">{selected.filiere}</p>}
-              {isBureauMember(selected.prenom, selected.nom) && (
+              {isPresident(selected.prenom, selected.nom) && (
+                <span className="inline-block mt-2 bg-yellow-500 text-white text-xs px-3 py-1 rounded-full font-semibold">
+                  👑 Président de l&apos;UEEMT-Tokat
+                </span>
+              )}
+              {!isPresident(selected.prenom, selected.nom) && isBureauMember(selected.prenom, selected.nom) && (
                 <span className="inline-block mt-2 bg-green-600 text-white text-xs px-3 py-1 rounded-full font-semibold">
-                  Membre du Bureau Exécutif
+                  ⭐ Membre du Bureau Exécutif
                 </span>
               )}
             </div>

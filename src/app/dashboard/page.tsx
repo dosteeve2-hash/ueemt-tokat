@@ -17,7 +17,7 @@ export default async function DashboardPage() {
 
     if (!profile) redirect('/onboarding')
 
-    if (profile.role === 'admin') redirect('/dashboard/admin')
+    if (profile.role === 'admin' || profile.role === 'president') redirect('/dashboard/admin')
 
     const { data: documents } = await supabase
       .from('documents')

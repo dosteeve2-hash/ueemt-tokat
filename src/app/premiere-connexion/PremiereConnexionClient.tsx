@@ -7,7 +7,7 @@ import { ArrowLeft, Lock, Eye, EyeOff, Search, CheckCircle, Loader2, Mail } from
 import { creerCompteEtConnecter } from './actions'
 import { broadcastSocialEvent } from '@/lib/broadcast'
 
-type Membre = { id: string; nom_complet: string; filiere: string | null }
+type Membre = { id: string; prenom: string; nom: string; nom_complet: string; filiere: string | null }
 type Step = 'liste' | 'password' | 'succes'
 
 export default function PremiereConnexionClient() {
@@ -42,6 +42,8 @@ export default function PremiereConnexionClient() {
       setMembres(
         data.map((m) => ({
           id: m.id,
+          prenom: m.prenom ?? '',
+          nom: m.nom ?? '',
           nom_complet: `${m.prenom ?? ''} ${m.nom ?? ''}`.trim(),
           filiere: m.filiere,
         }))
@@ -105,9 +107,23 @@ export default function PremiereConnexionClient() {
     if (err) { setError(err); return }
 
     // Broadcast "nouveau membre" à tous les connectés
+    // Lier member_id au profil (onboarding)
+    try {
+      await fetch('/api/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          memberId: selectedMembre.id,
+          prenom: selectedMembre.prenom,
+          nom: selectedMembre.nom,
+        }),
+      })
+    } catch { /* non-bloquant */ }
+
+    // Broadcast "nouveau membre" à tous les connectés
     void broadcastSocialEvent('new_member', {
       userId: selectedMembre.id,
-      prenom: selectedMembre.nom_complet.split(' ')[0] ?? selectedMembre.nom_complet,
+      prenom: selectedMembre.prenom,
     })
     setStep('succes')
   }
