@@ -8,13 +8,12 @@ import { creerCompteEtConnecter } from './actions'
 type Membre = { id: string; nom_complet: string; filiere: string | null }
 type Step = 'liste' | 'password' | 'succes'
 
-interface Props {
-  membres: Membre[]
-  loadError?: boolean
-}
-
-export default function PremiereConnexionClient({ membres, loadError = false }: Props) {
+export default function PremiereConnexionClient() {
   const router = useRouter()
+
+  const [membres, setMembres] = useState<Membre[]>([])
+  const [loadError, setLoadError] = useState(false)
+  const [loadingMembres, setLoadingMembres] = useState(true)
 
   const [step, setStep] = useState<Step>('liste')
   const [query, setQuery] = useState('')
@@ -28,10 +27,37 @@ export default function PremiereConnexionClient({ membres, loadError = false }: 
 
   const searchRef = useRef<HTMLInputElement>(null)
 
+  // Chargement client-side via API route (contourne tous les problèmes de RLS/cookies)
+  const fetchMembres = async () => {
+    setLoadingMembres(true)
+    setLoadError(false)
+    try {
+      const res = await fetch('/api/membres')
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json() as Array<{ id: string; prenom: string; nom: string; filiere: string | null }>
+      if (!Array.isArray(data)) throw new Error('Format inattendu')
+      setMembres(
+        data.map((m) => ({
+          id: m.id,
+          nom_complet: `${m.prenom ?? ''} ${m.nom ?? ''}`.trim(),
+          filiere: m.filiere,
+        }))
+      )
+    } catch {
+      setLoadError(true)
+    } finally {
+      setLoadingMembres(false)
+    }
+  }
+
+  useEffect(() => {
+    void fetchMembres()
+  }, [])
+
   // Focus le champ recherche à l'ouverture
   useEffect(() => {
-    if (step === 'liste') searchRef.current?.focus()
-  }, [step])
+    if (step === 'liste' && !loadingMembres) searchRef.current?.focus()
+  }, [step, loadingMembres])
 
   // Redirect après succès
   useEffect(() => {
@@ -168,7 +194,12 @@ export default function PremiereConnexionClient({ membres, loadError = false }: 
               />
             </div>
 
-            {loadError ? (
+            {loadingMembres ? (
+              <div className="text-center py-10">
+                <Loader2 size={28} className="animate-spin text-green-600 mx-auto mb-3" />
+                <p className="text-sm text-gray-400">Chargement de la liste...</p>
+              </div>
+            ) : loadError ? (
               <div className="text-center py-10">
                 <div className="text-4xl mb-3">⚠️</div>
                 <p className="font-semibold text-gray-700">Problème de connexion</p>
@@ -177,17 +208,25 @@ export default function PremiereConnexionClient({ membres, loadError = false }: 
                 </p>
                 <button
                   type="button"
-                  onClick={() => window.location.reload()}
+                  onClick={() => void fetchMembres()}
                   className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-full text-sm font-semibold"
                 >
                   Réessayer
                 </button>
               </div>
             ) : membres.length === 0 ? (
-              <div className="text-center py-10 text-gray-400 text-sm">
-                <div className="text-4xl mb-3">🔍</div>
-                <p className="font-medium text-gray-500">Aucun membre inscrit</p>
-                <p className="text-xs mt-1">Commence par te recenser, puis reviens ici.</p>
+              <div className="rounded-2xl border p-10 text-center">
+                <div className="text-5xl mb-4">🔍</div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Aucun membre recensé</h3>
+                <p className="text-gray-500 text-sm mb-6 max-w-xs mx-auto">
+                  Commence par compléter le recensement, puis reviens ici créer ton compte.
+                </p>
+                <a
+                  href="/recensement"
+                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-full font-semibold text-sm inline-block"
+                >
+                  Se recenser →
+                </a>
               </div>
             ) : filtered.length === 0 ? (
               <div className="text-center py-8 text-gray-400 text-sm">
