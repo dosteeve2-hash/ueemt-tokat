@@ -1,27 +1,16 @@
 'use client'
 
-export default function FeedError({
-  reset,
-}: {
-  error: Error & { digest?: string }
-  reset: () => void
-}) {
+import { useEffect } from 'react'
+
+export default function FeedError({ error, reset }: { error: Error; reset: () => void }) {
+  useEffect(() => { console.error('[Feed]', error) }, [error])
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="flex flex-col items-center text-center max-w-sm">
-        <div className="text-5xl mb-4">😕</div>
-        <h2 className="text-lg font-semibold text-gray-800 mb-2">
-          Le fil d&apos;actualité ne répond pas
-        </h2>
-        <p className="text-sm text-gray-500 mb-6">
-          Une erreur est survenue lors du chargement. Tes autres sections restent accessibles.
-        </p>
-        <button
-          onClick={reset}
-          className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors"
-        >
-          Réessayer
-        </button>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center max-w-md w-full">
+        <div className="text-5xl mb-4">📡</div>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">Le fil n'a pas pu se charger</h2>
+        <p className="text-gray-500 text-sm mb-6">Vérifie ta connexion et réessaie.</p>
+        <button onClick={reset} className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full font-semibold transition-colors">Réessayer</button>
       </div>
     </div>
   )
