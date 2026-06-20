@@ -410,4 +410,99 @@ Après chaque maintenance, produire un rapport structuré :
 
 ---
 
-*Maintenu par Steve Donald Compaoré — dernière mise à jour : 2026-06-15*
+---
+
+## Fonctionnalités récemment livrées (2026-06)
+
+### UX Auth — Connexion / Inscription
+- `/connexion` et `/premiere-connexion` ont des onglets visuels "Se connecter" | "Créer mon compte"
+- Toast `toast.success('Connecté(e) !')` après login réussi via `src/lib/toast.ts`
+- Messages d'erreur sans "Contacter un administrateur" → tout pointe vers /recensement ou self-help
+- `/api/membres` (admin client bypass RLS) = source unique pour la liste membres côté client
+
+### Navbar
+- Sur desktop : lien "Mon espace" avec icône + texte (plus visible que l'icône seul)
+- Sur mobile : dashboard dans le menu hamburger
+
+### Homepage publique
+- Galerie photos (9 photos, 3 colonnes) en PREMIER — donne envie avant les textes
+- Section posts publics juste après (avec noms d'auteurs réels via jointure user_profiles → members)
+- CTA adaptatif : connecté → "Partager / Profil / Albums" ; déconnecté → "Se connecter / Créer mon compte"
+- Stat membre count live depuis Supabase (plus hardcodé)
+
+### Présence temps réel
+- `src/hooks/usePresence.ts` — Supabase Realtime Presence sur channel `online-users`
+- Affiché dans le header de FeedClient (● N membres en ligne — Prénom1, Prénom2...)
+
+---
+
+## Prochaines fonctionnalités planifiées
+
+### 🗺️ Carte des membres (P5)
+**Objectif** : chaque membre peut partager sa position approximative sur Tokat, les autres voient où habitent leurs camarades.
+
+**Stack** : Leaflet.js (gratuit, pas de clé API) + Supabase colonnes `latitude`/`longitude` dans `user_profiles`
+
+**Architecture** :
+```
+1. Supabase — ALTER TABLE user_profiles ADD COLUMN latitude float, longitude float, location_shared bool DEFAULT false
+2. /profil — section "Ma position" avec bouton "Partager ma position" (navigator.geolocation)
+   - Affiche une mini-carte Leaflet centrée sur la position choisie
+   - Option "Ne pas partager" (location_shared = false → position cachée)
+3. /membres/carte — Page carte avec tous les membres qui ont location_shared = true
+   - Marqueurs Leaflet avec avatar + prénom au survol
+   - Clustering si plusieurs membres proches (Leaflet.markercluster)
+4. RLS : location visible uniquement aux membres authentifiés (is_validated = true)
+```
+
+**Composants à créer** :
+- `src/components/MemberMap.tsx` — client component (import dynamique next/dynamic + ssr:false)
+- `src/app/membres/carte/page.tsx` — page carte
+- `src/app/profil/LocationPicker.tsx` — picker de position dans le profil
+
+**Sécurité** : position approximative seulement (arrondir à 3 décimales ≈ 100m), jamais l'adresse exacte.
+
+---
+
+### 🛒 Marketplace membres (P6)
+**Objectif** : permettre aux membres de poster des annonces (vente, échange, service) visibles par la communauté.
+
+**Tables Supabase** :
+```sql
+CREATE TABLE listings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  author_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  title text NOT NULL,
+  description text,
+  price decimal(10,2),
+  currency text DEFAULT 'TRY',
+  category text CHECK (category IN ('vente', 'echange', 'service', 'don')),
+  photos text[], -- URLs Supabase Storage
+  is_active bool DEFAULT true,
+  created_at timestamptz DEFAULT now()
+);
+-- RLS : lecture pour tous les membres validés, écriture pour l'auteur uniquement
+```
+
+**Pages** :
+- `/marketplace` — grille des annonces actives (filtre par catégorie)
+- `/marketplace/[id]` — détail annonce + contact via DM ou WhatsApp
+- `/marketplace/nouvelle` — formulaire création (titre, desc, prix, catégorie, photos)
+- Dashboard → tab "Mes annonces" — gérer ses annonces
+
+**Composants** :
+- `ListingCard.tsx` — carte annonce (photo, titre, prix, catégorie, auteur)
+- `ListingForm.tsx` — formulaire avec upload photos (Supabase Storage bucket `marketplace`)
+
+**Navigation** : ajouter `/marketplace` dans la Navbar (icône ShoppingBag) pour les membres connectés
+
+---
+
+### 🎨 Améliorations design à venir
+- Utiliser le `design:design-critique` skill pour auditer chaque nouvelle page
+- Utiliser le `design:accessibility-review` skill avant chaque PR (WCAG 2.1 AA)
+- Palette dark mode à affiner pour le marketplace
+
+---
+
+*Maintenu par Steve Donald Compaoré — dernière mise à jour : 2026-06-20*
