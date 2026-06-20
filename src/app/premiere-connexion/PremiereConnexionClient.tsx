@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Lock, Eye, EyeOff, Search, CheckCircle, Loader2, Mail } from 'lucide-react'
 import { creerCompteEtConnecter } from './actions'
+import { broadcastSocialEvent } from '@/lib/broadcast'
 
 type Membre = { id: string; nom_complet: string; filiere: string | null }
 type Step = 'liste' | 'password' | 'succes'
@@ -102,6 +103,12 @@ export default function PremiereConnexionClient() {
     const { error: err } = await creerCompteEtConnecter(selectedMembre.id, email.trim(), password)
     setLoading(false)
     if (err) { setError(err); return }
+
+    // Broadcast "nouveau membre" à tous les connectés
+    void broadcastSocialEvent('new_member', {
+      userId: selectedMembre.id,
+      prenom: selectedMembre.nom_complet.split(' ')[0] ?? selectedMembre.nom_complet,
+    })
     setStep('succes')
   }
 

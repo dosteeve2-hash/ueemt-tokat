@@ -30,7 +30,7 @@ export default async function FeedPage() {
   const [{ data: myProfile }, { data: postsData }, stories] = await Promise.all([
     supabase
       .from('user_profiles')
-      .select('id, avatar_url, member_id, role')
+      .select('id, avatar_url, bio, member_id, role')
       .eq('id', user.id)
       .maybeSingle(),
     supabase
@@ -109,6 +109,8 @@ export default async function FeedPage() {
   })
 
   const isAdmin = myProfile?.role === 'admin'
+  const hasBio = !!((myProfile as { bio?: string | null } | null)?.bio?.trim())
+  const hasAvatar = !!(myProfile?.avatar_url)
 
   return (
     <FeedClient
@@ -118,6 +120,8 @@ export default async function FeedPage() {
       currentUserName={myMemberName}
       stories={stories}
       isAdmin={isAdmin}
+      hasBio={hasBio}
+      hasAvatar={hasAvatar}
     />
   )
 }

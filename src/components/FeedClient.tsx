@@ -12,7 +12,9 @@ import StoriesRow from '@/components/StoriesRow'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { useModal } from '@/hooks/useModal'
 import { usePresence } from '@/hooks/usePresence'
+import { useSocialActivity } from '@/hooks/useSocialActivity'
 import { toast } from '@/lib/toast'
+import Link from 'next/link'
 
 // TODO: Pour les vidéos volumineuses en production, migrer vers Cloudflare R2 (10 GB gratuit)
 // au lieu de Supabase Storage (1 GB sur free tier). Voir cloudflare.com/developer-platform/r2/
@@ -41,6 +43,8 @@ interface Props {
   currentUserName: { prenom: string; nom: string }
   stories?: StoryData[]
   isAdmin?: boolean
+  hasBio?: boolean
+  hasAvatar?: boolean
 }
 
 type MediaMode = 'image' | 'video' | 'document' | null
@@ -424,7 +428,7 @@ function PostCard({
 }
 
 // ─── FeedClient ──────────────────────────────────────────────────────────────
-export default function FeedClient({ posts: initialPosts, currentUserId, currentUserAvatar, currentUserName, stories = [], isAdmin = false }: Props) {
+export default function FeedClient({ posts: initialPosts, currentUserId, currentUserAvatar, currentUserName, stories = [], isAdmin = false, hasBio = true, hasAvatar = true }: Props) {
   const router = useRouter()
   const [posts, setPosts] = useState<FeedPost[]>(initialPosts)
   const [likedSet, setLikedSet] = useState<Set<string>>(
@@ -696,6 +700,9 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
     currentUserName.nom,
   )
 
+  // Toasts discrets quand d'autres membres complètent leur profil / rejoignent
+  useSocialActivity(currentUserId)
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-green-600 text-white py-12 relative overflow-hidden">
@@ -727,6 +734,31 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
         {/* Stories */}
         {(stories.length > 0 || isAdmin) && (
           <StoriesRow stories={stories} isAdmin={isAdmin} currentUserId={currentUserId} />
+        )}
+
+        {/* Nudge profil incomplet — encouragement discret */}
+        {(!hasBio || !hasAvatar) && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-4">
+            <span className="text-2xl flex-shrink-0">👤</span>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-amber-800 text-sm">
+                {!hasAvatar && !hasBio
+                  ? 'Tes camarades veulent te connaître !'
+                  : !hasAvatar
+                  ? 'Ajoute une photo de profil !'
+                  : 'Présente-toi en quelques mots !'}
+              </p>
+              <p className="text-amber-600 text-xs mt-0.5">
+                Un profil complet renforce la communauté.
+              </p>
+            </div>
+            <Link
+              href="/profil"
+              className="flex-shrink-0 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl font-semibold text-xs transition-colors whitespace-nowrap"
+            >
+              Compléter →
+            </Link>
+          </div>
         )}
 
         {/* Composer */}
