@@ -1,7 +1,8 @@
 'use client'
 
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { Users } from 'lucide-react'
+import { getFiliereBadge, getUniqueFiliereBadges } from '@/lib/filiereBadge'
 import type { MembreCard } from '@/app/membres/page'
 
 interface Props {
@@ -16,6 +17,22 @@ const AVATAR_COLORS = [
 ]
 
 export default function MembresClient({ membres, isAdmin, currentUserId }: Props) {
+  const [activeFiliere, setActiveFiliere] = useState<string | null>(null)
+
+  // Pills de filière uniques à partir des membres
+  const filierePills = useMemo(
+    () => getUniqueFiliereBadges(membres.map((m) => m.filiere)),
+    [membres]
+  )
+
+  const filtered = useMemo(() => {
+    if (!activeFiliere) return membres
+    return membres.filter((m) => {
+      const badge = getFiliereBadge(m.filiere)
+      return badge.label === activeFiliere
+    })
+  }, [membres, activeFiliere])
+
   return (
     <div className="min-h-screen bg-white">
       <header className="bg-green-600 text-white py-16">
@@ -59,51 +76,113 @@ export default function MembresClient({ membres, isAdmin, currentUserId }: Props
             </a>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {membres.map((m, i) => (
-              <Link
-                key={m.id}
-                href={`/membres/${m.id}`}
-                className="group bg-white rounded-2xl border border-gray-100 p-5 text-center hover:shadow-md hover:border-green-200 transition-all"
-              >
-                <div className="mx-auto mb-3 w-16 h-16">
-                  {m.avatarUrl ? (
-                    <img
-                      src={m.avatarUrl}
-                      alt={`${m.prenom} ${m.nom}`}
-                      className="w-16 h-16 rounded-full object-cover ring-2 ring-green-100 group-hover:ring-green-300 transition-all"
-                    />
-                  ) : (
-                    <div
-                      className={`w-16 h-16 rounded-full ${AVATAR_COLORS[i % AVATAR_COLORS.length]} flex items-center justify-center text-white text-xl font-black ring-2 ring-transparent group-hover:ring-green-200 transition-all`}
+          <>
+            {/* ── Filtres par filière ── */}
+            {filierePills.length > 1 && (
+              <div className="flex flex-wrap gap-2 mb-6">
+                <button
+                  onClick={() => setActiveFiliere(null)}
+                  className={`text-sm font-semibold px-4 py-2 rounded-full transition-colors ${
+                    activeFiliere === null
+                      ? 'bg-green-600 text-white shadow-sm'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  Tous ({membres.length})
+                </button>
+                {filierePills.map(({ filiere, badge }) => {
+                  const count = membres.filter(
+                    (m) => getFiliereBadge(m.filiere).label === filiere
+                  ).length
+                  const isActive = activeFiliere === filiere
+                  return (
+                    <button
+                      key={filiere}
+                      onClick={() => setActiveFiliere(isActive ? null : filiere)}
+                      className={`text-sm font-semibold px-4 py-2 rounded-full transition-colors flex items-center gap-1.5 ${
+                        isActive
+                          ? `${badge.color} ring-2 ring-offset-1 ring-current shadow-sm`
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
                     >
-                      {m.prenom?.[0]?.toUpperCase()}{m.nom?.[0]?.toUpperCase()}
+                      <span>{badge.emoji}</span>
+                      <span>{filiere}</span>
+                      <span className={`text-xs ${isActive ? 'opacity-70' : 'text-gray-400'}`}>
+                        ({count})
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Compteur si filtre actif */}
+            {activeFiliere && (
+              <p className="text-sm text-gray-500 mb-4">
+                {filtered.length} membre{filtered.length !== 1 ? 's' : ''} en{' '}
+                <strong>{activeFiliere}</strong>
+                <button
+                  onClick={() => setActiveFiliere(null)}
+                  className="ml-2 text-green-600 hover:text-green-700 underline text-xs"
+                >
+                  Voir tous
+                </button>
+              </p>
+            )}
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {filtered.map((m, i) => {
+                const badge = getFiliereBadge(m.filiere)
+                return (
+                  <Link
+                    key={m.id}
+                    href={`/membres/${m.id}`}
+                    className="group bg-white rounded-2xl border border-gray-100 p-5 text-center hover:shadow-md hover:border-green-200 transition-all"
+                  >
+                    <div className="mx-auto mb-3 w-16 h-16">
+                      {m.avatarUrl ? (
+                        <img
+                          src={m.avatarUrl}
+                          alt={`${m.prenom} ${m.nom}`}
+                          className="w-16 h-16 rounded-full object-cover ring-2 ring-green-100 group-hover:ring-green-300 transition-all"
+                        />
+                      ) : (
+                        <div
+                          className={`w-16 h-16 rounded-full ${AVATAR_COLORS[i % AVATAR_COLORS.length]} flex items-center justify-center text-white text-xl font-black ring-2 ring-transparent group-hover:ring-green-200 transition-all`}
+                        >
+                          {m.prenom?.[0]?.toUpperCase()}{m.nom?.[0]?.toUpperCase()}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                <p className="font-bold text-gray-900 text-sm leading-tight group-hover:text-green-700 transition-colors">
-                  {m.prenom} {m.nom}
-                </p>
+                    <p className="font-bold text-gray-900 text-sm leading-tight group-hover:text-green-700 transition-colors">
+                      {m.prenom} {m.nom}
+                    </p>
 
-                {m.role ? (
-                  <span className={`inline-block mt-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${
-                    m.role === 'admin' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                  }`}>
-                    {m.role === 'admin' ? 'Bureau' : 'Membre'}
-                  </span>
-                ) : null}
+                    {m.role ? (
+                      <span className={`inline-block mt-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        m.role === 'admin' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                      }`}>
+                        {m.role === 'admin' ? 'Bureau' : 'Membre'}
+                      </span>
+                    ) : null}
 
-                {m.filiere && (
-                  <p className="text-xs text-gray-400 mt-1 line-clamp-1">{m.filiere}</p>
-                )}
+                    {/* Badge filière */}
+                    <div className="mt-2 flex justify-center">
+                      <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold ${badge.color}`}>
+                        <span>{badge.emoji}</span>
+                        <span className="truncate max-w-[100px]">{badge.label}</span>
+                      </span>
+                    </div>
 
-                {m.bio && (
-                  <p className="text-xs text-gray-500 mt-2 line-clamp-2 leading-relaxed">{m.bio}</p>
-                )}
-              </Link>
-            ))}
-          </div>
+                    {m.bio && (
+                      <p className="text-xs text-gray-500 mt-2 line-clamp-2 leading-relaxed">{m.bio}</p>
+                    )}
+                  </Link>
+                )
+              })}
+            </div>
+          </>
         )}
       </div>
     </div>

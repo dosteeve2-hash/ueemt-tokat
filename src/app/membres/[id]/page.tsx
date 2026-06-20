@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, GraduationCap, Calendar, Award, Mail, Lock, FileText } from 'lucide-react'
+import { ArrowLeft, GraduationCap, Calendar, Award, Mail, FileText } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import FiliereBadge from '@/components/FiliereBadge'
+import { getFiliereBadge } from '@/lib/filiereBadge'
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params
@@ -79,18 +81,62 @@ export default async function MembreProfilePage({ params }: { params: Promise<{ 
     )
   }
 
-  // Fetch recent posts if member has a public profile
+  // Fetch recent posts + camarades de filière en parallèle
   let recentPosts: { id: string; content: string | null; image_url: string | null; created_at: string }[] = []
-  if (profile?.is_public) {
-    const { data } = await supabase
-      .from('posts')
-      .select('id, content, image_url, created_at')
-      .eq('author_id', profile.id)
-      .eq('type', 'post')
-      .order('created_at', { ascending: false })
-      .limit(3)
-    recentPosts = data ?? []
-  }
+  let camarades: { id: string; prenom: string; nom: string; avatarUrl: string | null }[] = []
+
+  const filiereBadge = getFiliereBadge(member.filiere)
+
+  await Promise.all([
+    (async () => {
+      if (!profile?.is_public) return
+      const { data } = await supabase
+        .from('posts')
+        .select('id, content, image_url, created_at')
+        .eq('author_id', profile.id)
+        .eq('type', 'post')
+        .order('created_at', { ascending: false })
+        .limit(3)
+      recentPosts = data ?? []
+    })(),
+    (async () => {
+      if (!member.filiere) return
+      // Trouver des membres de la même filière (approx. match sur le badge label)
+      const { data: sameFiliereMembers } = await supabase
+        .from('members')
+        .select('id, prenom, nom, filiere')
+        .eq('is_validated', true)
+        .neq('id', id)
+        .not('filiere', 'is', null)
+        .limit(20)
+
+      if (!sameFiliereMembers) return
+
+      // Filtrer par badge (même label = même catégorie de filière)
+      const sameCategory = sameFiliereMembers.filter(
+        (m) => getFiliereBadge(m.filiere).label === filiereBadge.label
+      ).slice(0, 4)
+
+      if (sameCategory.length === 0) return
+
+      const memberIds = sameCategory.map((m) => m.id)
+      const { data: profiles } = await supabase
+        .from('user_profiles')
+        .select('member_id, avatar_url')
+        .in('member_id', memberIds)
+
+      const avatarMap = Object.fromEntries(
+        (profiles ?? []).map((p) => [p.member_id as string, p.avatar_url as string | null])
+      )
+
+      camarades = sameCategory.map((m) => ({
+        id: m.id,
+        prenom: m.prenom,
+        nom: m.nom,
+        avatarUrl: avatarMap[m.id] ?? null,
+      }))
+    })(),
+  ])
 
   const initials = `${member.prenom?.[0] ?? ''}${member.nom?.[0] ?? ''}`.toUpperCase()
   const memberSince = new Date(member.created_at).toLocaleDateString('fr-FR', {
@@ -173,8 +219,9 @@ export default async function MembreProfilePage({ params }: { params: Promise<{ 
                 <div className="flex items-center gap-2 bg-gray-50 rounded-xl p-3">
                   <GraduationCap size={16} className="text-green-600 flex-shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">Filière</p>
-                    <p className="text-sm font-semibold text-gray-900 line-clamp-1">{member.filiere}</p>
+                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Filière</p>
+                    <FiliereBadge filiere={member.filiere} size="sm" />
+                    <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{member.filiere}</p>
                   </div>
                 </div>
               )}
@@ -197,6 +244,48 @@ export default async function MembreProfilePage({ params }: { params: Promise<{ 
             </div>
           </div>
         </div>
+
+        {/* Camarades de filière */}
+        {camarades.length > 0 && (
+          <div className="mt-6">
+            <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <span>{filiereBadge.emoji}</span>
+              Camarades en {filiereBadge.label}
+            </h2>
+            <div className="bg-white rounded-2xl border border-gray-100 p-4">
+              <div className="flex flex-wrap gap-3">
+                {camarades.map((c) => (
+                  <Link
+                    key={c.id}
+                    href={`/membres/${c.id}`}
+                    className="flex items-center gap-2 bg-gray-50 hover:bg-green-50 rounded-xl px-3 py-2 transition-colors group"
+                  >
+                    {c.avatarUrl ? (
+                      <img
+                        src={c.avatarUrl}
+                        alt={`${c.prenom} ${c.nom}`}
+                        className="w-8 h-8 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                        {c.prenom[0]?.toUpperCase()}{c.nom[0]?.toUpperCase()}
+                      </div>
+                    )}
+                    <span className="text-sm font-semibold text-gray-800 group-hover:text-green-700 transition-colors">
+                      {c.prenom} {c.nom}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+              <Link
+                href={`/membres?filiere=${encodeURIComponent(filiereBadge.label)}`}
+                className="inline-block mt-3 text-xs text-green-600 hover:text-green-700 font-medium"
+              >
+                Voir tous les membres en {filiereBadge.label} →
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* Recent posts */}
         {recentPosts.length > 0 && (

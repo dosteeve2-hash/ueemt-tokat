@@ -18,6 +18,7 @@ export type FeedPost = {
   author_prenom: string
   author_nom: string
   author_avatar: string | null
+  author_filiere: string | null
   likes_count: number
   user_liked: boolean
   comments_count: number
@@ -86,9 +87,9 @@ export default async function FeedPage() {
   // Layer 3: membersData for post authors depends on authorProfiles — stays sequential
   const profilesData = authorProfilesResp.data ?? []
   const memberIds = [...new Set(profilesData.map(p => p.member_id).filter(Boolean))] as string[]
-  let membersData: { id: string; prenom: string; nom: string }[] = []
+  let membersData: { id: string; prenom: string; nom: string; filiere?: string | null }[] = []
   if (memberIds.length > 0) {
-    const { data } = await supabase.from('members').select('id, prenom, nom').in('id', memberIds)
+    const { data } = await supabase.from('members').select('id, prenom, nom, filiere').in('id', memberIds)
     membersData = data ?? []
   }
 
@@ -114,6 +115,7 @@ export default async function FeedPage() {
       author_prenom: mem?.prenom ?? 'Membre',
       author_nom: mem?.nom ?? '',
       author_avatar: prof?.avatar_url ?? null,
+      author_filiere: mem?.filiere ?? null,
       likes_count: likesByPost[p.id] ?? 0,
       user_liked: userLikedSet.has(p.id),
       comments_count: commentsByPost[p.id] ?? 0,

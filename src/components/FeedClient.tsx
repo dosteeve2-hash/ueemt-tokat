@@ -4,6 +4,7 @@ import { useState, useTransition, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Heart, Trash2, Megaphone, Send, Loader2, MessageCircle, ChevronDown, ChevronUp, ImagePlus, X, Share2, Check, Paperclip, FileText, FileSpreadsheet, Presentation, File } from 'lucide-react'
 import { createPost, deletePost, toggleLike, addComment, deleteComment, getCommentsWithAuthors } from '@/app/feed/actions'
+import { getFiliereBadge } from '@/lib/filiereBadge'
 import { createClient } from '@/lib/supabase/client'
 import type { FeedPost } from '@/app/feed/page'
 import type { PostCommentData } from '@/app/feed/actions'
@@ -357,7 +358,18 @@ function PostCard({
         <div className="flex items-start gap-3 mb-3">
           <Avatar name={authorName} avatar={post.author_avatar} size={9} colorIdx={colorIdx} />
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-gray-900 text-sm leading-tight">{authorName}</p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <p className="font-semibold text-gray-900 text-sm leading-tight">{authorName}</p>
+              {post.author_filiere && (() => {
+                const badge = getFiliereBadge(post.author_filiere)
+                return (
+                  <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${badge.color}`}>
+                    <span>{badge.emoji}</span>
+                    <span>{badge.label}</span>
+                  </span>
+                )
+              })()}
+            </div>
             <p className="text-xs text-gray-400">{timeAgo(post.created_at)}</p>
           </div>
           {isOwn && (
@@ -698,6 +710,7 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
       author_prenom: currentUserName.prenom,
       author_nom: currentUserName.nom,
       author_avatar: currentUserAvatar,
+      author_filiere: null,
       likes_count: 0,
       user_liked: false,
       comments_count: 0,
