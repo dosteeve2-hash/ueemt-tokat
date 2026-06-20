@@ -199,17 +199,18 @@ export default function Navbar() {
                 </Link>
                 <Link
                   href={dashboardHref}
-                  className="text-gray-400 dark:text-slate-500 hover:text-green-600 dark:hover:text-green-400 transition-colors p-1"
+                  className="flex items-center gap-1.5 text-gray-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-400 font-semibold text-sm transition-colors px-2 py-1 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800"
                   title="Mon espace"
                 >
-                  <LayoutDashboard size={16} />
+                  <LayoutDashboard size={15} />
+                  <span>Mon espace</span>
                 </Link>
                 <button
                   onClick={handleSignOut}
-                  className="text-gray-400 dark:text-slate-500 hover:text-red-500 transition-colors p-1"
+                  className="flex items-center gap-1 text-gray-400 dark:text-slate-500 hover:text-red-500 transition-colors p-1 text-xs font-medium"
                   title="Déconnexion"
                 >
-                  <LogOut size={16} />
+                  <LogOut size={15} />
                 </button>
               </div>
             ) : (

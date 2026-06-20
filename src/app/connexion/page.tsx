@@ -2,9 +2,11 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Lock, Mail, Eye, EyeOff, CheckCircle, ArrowLeft, UserPlus } from 'lucide-react'
+import Link from 'next/link'
+import { Lock, Mail, Eye, EyeOff, CheckCircle, ArrowLeft } from 'lucide-react'
 import { signInWithPassword, sendPasswordReset } from './actions'
 import { createClient } from '@/lib/supabase/client'
+import { toast } from '@/lib/toast'
 
 type View = 'login' | 'forgot' | 'forgot-sent'
 
@@ -61,6 +63,7 @@ function ConnexionContent() {
       if (err) {
         setError(err)
       } else {
+        toast.success('Connecté(e) !', 'Bienvenue sur UEEMT-Tokat 🎉')
         router.push('/feed')
       }
     } catch {
@@ -92,6 +95,19 @@ function ConnexionContent() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 w-full max-w-md">
+
+        {/* Onglets Se connecter / Créer mon compte */}
+        <div className="flex bg-gray-100 rounded-xl p-1 mb-7 gap-1">
+          <div className="flex-1 py-2.5 text-center rounded-lg font-bold text-sm bg-white shadow-sm text-gray-900">
+            Se connecter
+          </div>
+          <Link
+            href="/premiere-connexion"
+            className="flex-1 py-2.5 text-center rounded-lg font-semibold text-sm text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            Créer mon compte
+          </Link>
+        </div>
 
         {/* Header */}
         <div className="text-center mb-7">
@@ -227,19 +243,12 @@ function ConnexionContent() {
               {loading ? 'Connexion...' : 'Se connecter'}
             </button>
 
-            <div className="mt-2 pt-5 border-t border-gray-100 text-center">
-              <p className="text-sm text-gray-500 mb-2">Pas encore de mot de passe ?</p>
-              <a
-                href="/premiere-connexion"
-                className="inline-flex items-center gap-2 bg-gray-50 hover:bg-green-50 border border-gray-200 hover:border-green-300 text-gray-700 hover:text-green-700 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all"
-              >
-                <UserPlus size={16} />
-                Créer mon compte →
-              </a>
-              <p className="text-xs text-gray-400 mt-2">
-                Choisis ton nom dans la liste et définis ton mot de passe
-              </p>
-            </div>
+            <p className="text-center text-xs text-gray-400 pt-2">
+              Pas encore de compte ?{' '}
+              <Link href="/premiere-connexion" className="text-green-600 font-medium hover:underline">
+                Crée-le en 2 étapes →
+              </Link>
+            </p>
           </form>
         )}
 

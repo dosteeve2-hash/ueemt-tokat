@@ -56,7 +56,7 @@ export default async function HomePage() {
       { data: members },
     ] = await Promise.all([
       admin.from('members').select('*', { count: 'exact', head: true }).eq('is_active', true),
-      admin.from('photos').select('id, url, caption').order('created_at', { ascending: false }).limit(6),
+      admin.from('photos').select('id, url, caption').order('created_at', { ascending: false }).limit(9),
       admin.from('posts').select('id, content, created_at, author_id').order('created_at', { ascending: false }).limit(3),
       admin.from('members').select('id, prenom, nom').eq('is_active', true).order('created_at', { ascending: false }).limit(8),
     ])
@@ -124,6 +124,109 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* ── Section galerie — EN PREMIER pour donner envie ── */}
+      {recentPhotos.length > 0 && (
+        <section className="py-14 bg-white">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="text-center mb-8">
+              <span className="text-green-600 font-semibold text-sm uppercase tracking-widest">Galerie</span>
+              <h2 className="text-2xl sm:text-3xl font-bold mt-2 text-gray-900">Nos derniers moments</h2>
+              <p className="text-gray-500 text-sm mt-2">Retrouvez les photos de nos événements et activités à Tokat.</p>
+            </div>
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+              {recentPhotos.map((photo) => (
+                <div key={photo.id} className="relative aspect-square rounded-xl sm:rounded-2xl overflow-hidden bg-gray-200 group">
+                  <Image
+                    src={photo.url}
+                    alt={photo.caption ?? 'Photo UEEMT'}
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-300"
+                    sizes="(max-width: 640px) 33vw, 25vw"
+                  />
+                  {photo.caption && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 sm:p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <p className="text-white text-xs line-clamp-2">{photo.caption}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="text-center mt-8">
+              <Link
+                href={isLoggedIn ? '/activites' : '/connexion'}
+                className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-semibold inline-block transition-colors"
+              >
+                {isLoggedIn ? 'Voir tous les albums →' : 'Rejoindre pour voir plus →'}
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── Section posts récents ── */}
+      {recentPosts.length > 0 ? (
+        <section className="py-14 bg-gray-50">
+          <div className="max-w-4xl mx-auto px-4">
+            <div className="text-center mb-8">
+              <span className="text-green-600 font-semibold text-sm uppercase tracking-widest">Actualités</span>
+              <h2 className="text-2xl sm:text-3xl font-bold mt-2 text-gray-900">Ce que partagent les membres</h2>
+              <p className="text-gray-500 text-sm mt-2">Connecte-toi pour participer, liker et commenter.</p>
+            </div>
+            <div className="space-y-4">
+              {recentPosts.map((post) => (
+                <div key={post.id} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-9 h-9 rounded-full bg-green-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                      {post.prenom?.[0]?.toUpperCase() ?? 'U'}{post.nom?.[0]?.toUpperCase() ?? 'E'}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900 text-sm">
+                        {post.prenom && post.nom ? `${post.prenom} ${post.nom}` : 'Membre UEEMT'}
+                      </p>
+                      <p className="text-gray-400 text-xs">{timeAgo(post.created_at)}</p>
+                    </div>
+                  </div>
+                  <p className="text-gray-700 text-sm leading-relaxed">
+                    {post.content?.slice(0, 150)}{(post.content?.length ?? 0) > 150 ? '…' : ''}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center mt-8">
+              <Link
+                href="/connexion"
+                className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-semibold inline-block transition-colors text-center"
+              >
+                Se connecter pour voir plus →
+              </Link>
+              {!isLoggedIn && (
+                <Link
+                  href="/premiere-connexion"
+                  className="border-2 border-green-600 text-green-600 hover:bg-green-50 px-8 py-3 rounded-full font-semibold inline-block transition-colors text-center"
+                >
+                  Créer mon compte
+                </Link>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section className="py-14 bg-gray-50">
+          <div className="max-w-4xl mx-auto px-4">
+            <div className="rounded-2xl border p-16 text-center bg-white">
+              <div className="text-5xl mb-4">📰</div>
+              <h3 className="text-xl font-bold mb-2 text-gray-900">Sois le premier à partager !</h3>
+              <p className="text-gray-500 text-sm mb-6 max-w-sm mx-auto">
+                Le fil d&apos;actualité t&apos;attend. Partage tes moments, tes nouvelles, tes idées.
+              </p>
+              <Link href="/connexion" className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full font-semibold inline-block">
+                Rejoindre la communauté →
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ── Section membres actifs ── */}
       <section className="py-14 bg-white">
         <div className="max-w-7xl mx-auto px-4">
@@ -164,100 +267,6 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
-
-      {/* ── Section dernières photos ── */}
-      {recentPhotos.length > 0 && (
-        <section className="py-14 bg-gray-50">
-          <div className="max-w-7xl mx-auto px-4">
-            <div className="text-center mb-8">
-              <span className="text-green-600 font-semibold text-sm uppercase tracking-widest">Galerie</span>
-              <h2 className="text-2xl sm:text-3xl font-bold mt-2 text-gray-900">Nos derniers moments</h2>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-              {recentPhotos.map((photo) => (
-                <div key={photo.id} className="relative aspect-square rounded-2xl overflow-hidden bg-gray-200 group">
-                  <Image
-                    src={photo.url}
-                    alt={photo.caption ?? 'Photo UEEMT'}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-300"
-                    sizes="(max-width: 640px) 50vw, 33vw"
-                  />
-                  {photo.caption && (
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <p className="text-white text-xs line-clamp-2">{photo.caption}</p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="text-center mt-8">
-              <Link
-                href="/activites"
-                className="bg-white border-2 border-green-600 text-green-600 hover:bg-green-50 px-8 py-3 rounded-full font-semibold inline-block transition-colors"
-              >
-                Voir tous les albums →
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ── Section posts récents ── */}
-      {recentPosts.length > 0 ? (
-        <section className="py-14 bg-white">
-          <div className="max-w-4xl mx-auto px-4">
-            <div className="text-center mb-8">
-              <span className="text-green-600 font-semibold text-sm uppercase tracking-widest">Actualités</span>
-              <h2 className="text-2xl sm:text-3xl font-bold mt-2 text-gray-900">Dernières nouvelles</h2>
-            </div>
-            <div className="space-y-4">
-              {recentPosts.map((post) => (
-                <div key={post.id} className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-9 h-9 rounded-full bg-green-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
-                      {post.prenom?.[0]?.toUpperCase() ?? 'U'}{post.nom?.[0]?.toUpperCase() ?? 'E'}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-gray-900 text-sm">
-                        {post.prenom && post.nom ? `${post.prenom} ${post.nom}` : 'Membre UEEMT'}
-                      </p>
-                      <p className="text-gray-400 text-xs">{timeAgo(post.created_at)}</p>
-                    </div>
-                  </div>
-                  <p className="text-gray-700 text-sm leading-relaxed line-clamp-3">
-                    {post.content?.slice(0, 150)}{(post.content?.length ?? 0) > 150 ? '…' : ''}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <div className="text-center mt-8">
-              <p className="text-gray-500 text-sm mb-4">Connecte-toi pour voir tous les posts, liker et commenter.</p>
-              <Link
-                href="/connexion"
-                className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-semibold inline-block transition-colors"
-              >
-                Rejoins-nous pour voir plus →
-              </Link>
-            </div>
-          </div>
-        </section>
-      ) : (
-        <section className="py-14 bg-white">
-          <div className="max-w-4xl mx-auto px-4">
-            <div className="rounded-2xl border p-16 text-center">
-              <div className="text-5xl mb-4">📰</div>
-              <h3 className="text-xl font-bold mb-2 text-gray-900">Le fil d&apos;actu arrive bientôt</h3>
-              <p className="text-gray-500 text-sm mb-6 max-w-sm mx-auto">
-                Les membres partagent bientôt leurs actualités. Rejoins la communauté !
-              </p>
-              <Link href="/recensement" className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full font-semibold inline-block">
-                Se recenser →
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* Values */}
       <section className="py-16 sm:py-20 bg-gray-50">
@@ -327,27 +336,30 @@ export default async function HomePage() {
         <div className="max-w-3xl mx-auto px-4 text-center text-white">
           {isLoggedIn ? (
             <>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">Bienvenue dans ta communauté</h2>
-              <p className="text-green-100 mb-8 text-base sm:text-lg">Explore l'espace membre, partage tes moments et retrouve tes camarades.</p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link href="/feed" className="bg-white text-green-700 hover:bg-green-50 px-8 py-4 rounded-xl font-bold text-base inline-block transition-colors shadow-lg">
-                  📰 Voir le fil d&apos;actu
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">Ta communauté t&apos;attend 🦁</h2>
+              <p className="text-green-100 mb-8 text-base sm:text-lg">Partage tes moments, complète ton profil, reste visible pour tes camarades.</p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center flex-wrap">
+                <Link href="/feed" className="bg-white text-green-700 hover:bg-green-50 px-7 py-3.5 rounded-xl font-bold text-sm inline-block transition-colors shadow-lg">
+                  📰 Partager une actu
                 </Link>
-                <Link href="/activites" className="bg-green-700/50 hover:bg-green-700/70 text-white border border-white/20 px-8 py-4 rounded-xl font-bold text-base inline-block transition-colors">
-                  🎉 Explorer les activités
+                <Link href="/profil" className="bg-green-700/50 hover:bg-green-700/70 text-white border border-white/20 px-7 py-3.5 rounded-xl font-bold text-sm inline-block transition-colors">
+                  👤 Compléter mon profil
+                </Link>
+                <Link href="/activites" className="bg-green-700/40 hover:bg-green-700/60 text-white border border-white/10 px-7 py-3.5 rounded-xl font-bold text-sm inline-block transition-colors">
+                  📸 Voir les albums
                 </Link>
               </div>
             </>
           ) : (
             <>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">Espace membres UEEMT-Tokat</h2>
-              <p className="text-green-100 mb-8 text-base sm:text-lg">Tu es déjà membre ? Connecte-toi pour accéder à l&apos;espace communautaire.</p>
-              <Link href="/connexion" className="bg-white text-green-700 hover:bg-green-50 px-8 sm:px-10 py-4 rounded-xl font-bold text-base sm:text-lg inline-block transition-colors shadow-lg">
-                Se connecter →
-              </Link>
-              <div className="mt-4">
-                <Link href="/recensement" className="text-green-200 hover:text-white text-sm underline underline-offset-2 transition-colors">
-                  Nouveau membre ? Se recenser
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">Rejoins la famille UEEMT-Tokat</h2>
+              <p className="text-green-100 mb-8 text-base sm:text-lg">Accède aux photos, aux actualités et retrouve tes camarades maliens à Tokat.</p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link href="/connexion" className="bg-white text-green-700 hover:bg-green-50 px-8 sm:px-10 py-4 rounded-xl font-bold text-base sm:text-lg inline-block transition-colors shadow-lg">
+                  Se connecter →
+                </Link>
+                <Link href="/premiere-connexion" className="bg-green-700/50 hover:bg-green-700/70 text-white border border-white/20 px-8 py-4 rounded-xl font-bold text-base inline-block transition-colors">
+                  Créer mon compte
                 </Link>
               </div>
             </>

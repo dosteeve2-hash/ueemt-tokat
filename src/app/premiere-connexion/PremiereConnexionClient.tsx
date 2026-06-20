@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { ArrowLeft, Lock, Eye, EyeOff, Search, CheckCircle, Loader2 } from 'lucide-react'
 import { creerCompteEtConnecter } from './actions'
 
@@ -113,6 +114,21 @@ export default function PremiereConnexionClient() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8 w-full max-w-md">
 
+        {/* Onglets Se connecter / Créer mon compte */}
+        {step !== 'succes' && (
+          <div className="flex bg-gray-100 rounded-xl p-1 mb-7 gap-1">
+            <Link
+              href="/connexion"
+              className="flex-1 py-2.5 text-center rounded-lg font-semibold text-sm text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              Se connecter
+            </Link>
+            <div className="flex-1 py-2.5 text-center rounded-lg font-bold text-sm bg-white shadow-sm text-gray-900">
+              Créer mon compte
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="text-center mb-7">
           <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -168,7 +184,7 @@ export default function PremiereConnexionClient() {
             className="flex items-center gap-1.5 text-gray-400 hover:text-gray-600 text-sm transition-colors mb-4"
           >
             <ArrowLeft size={14} />
-            {step === 'liste' ? 'Retour à la connexion' : 'Retour'}
+            {step === 'liste' ? 'Retour' : 'Retour'}
           </button>
         )}
 
