@@ -119,6 +119,7 @@ export default function Navbar() {
   const publicLinks = [
     { href: '/', label: t('nav.home'), icon: Home },
     { href: '/a-propos', label: t('nav.about'), icon: ChevronRight },
+    { href: '/archives', label: 'Archives', icon: ChevronRight },
     { href: '/membres', label: t('nav.members'), icon: Users },
     { href: '/activites', label: t('nav.activities'), icon: ChevronRight },
     { href: '/contact', label: t('nav.contact'), icon: ChevronRight },
