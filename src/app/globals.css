@@ -29,6 +29,12 @@ body {
   color: white;
 }
 
+/* ─── Ticker (caisse, annonces) ─────────────────────────────── */
+@keyframes marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
 /* ─── Dark mode ─────────────────────────────────────────────── */
 
 .dark body {

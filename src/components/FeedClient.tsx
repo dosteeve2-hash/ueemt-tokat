@@ -36,6 +36,20 @@ function getDocIcon(name: string) {
   return <File size={20} className="text-gray-500" />
 }
 
+// ─── Utilitaire : détecter les liens vidéo ──────────────────────────────────
+function getVideoEmbed(url: string): { type: 'youtube' | 'tiktok' | null; embedId: string | null } {
+  try {
+    const u = new URL(url)
+    // YouTube
+    const yt = u.searchParams.get('v') || (u.hostname === 'youtu.be' ? u.pathname.slice(1) : null)
+    if (yt) return { type: 'youtube', embedId: yt }
+    // TikTok
+    if (u.hostname.includes('tiktok.com')) return { type: 'tiktok', embedId: url }
+  } catch {}
+  return { type: null, embedId: null }
+}
+
+
 interface Props {
   posts: FeedPost[]
   currentUserId: string
@@ -45,9 +59,10 @@ interface Props {
   isAdmin?: boolean
   hasBio?: boolean
   hasAvatar?: boolean
+  caisseMontant?: number | null
 }
 
-type MediaMode = 'image' | 'video' | 'document' | null
+type MediaMode = 'image' | 'video' | 'document' | 'multi-image' | null
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -356,7 +371,24 @@ function PostCard({
           <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap break-words">{post.content}</p>
         )}
 
-        {post.image_url && !isVideoUrl(post.image_url) && (
+        {/* Multi-images (image_urls) */}
+        {post.image_urls && post.image_urls.length > 0 && (
+          <div className={`mt-3 grid gap-1.5 ${
+            post.image_urls.length === 1 ? 'grid-cols-1'
+            : post.image_urls.length === 2 ? 'grid-cols-2'
+            : post.image_urls.length >= 3 ? 'grid-cols-3'
+            : 'grid-cols-2'
+          }`}>
+            {post.image_urls.map((url, i) => (
+              <button key={i} onClick={() => onImageClick(url)} className="cursor-zoom-in rounded-xl overflow-hidden bg-gray-100 aspect-square" aria-label="Agrandir">
+                <img src={url} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover hover:opacity-90 transition-opacity" />
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Image unique (image_url) */}
+        {post.image_url && !isVideoUrl(post.image_url) && !(post.image_urls?.length) && (
           <button
             onClick={() => onImageClick(post.image_url!)}
             className="block w-full mt-3 cursor-zoom-in"
@@ -385,6 +417,35 @@ function PostCard({
             />
           </div>
         )}
+
+        {/* Lien YouTube/TikTok embed */}
+        {post.link_url && (() => {
+          const embed = getVideoEmbed(post.link_url)
+          if (embed.type === 'youtube') {
+            return (
+              <div className="mt-3 rounded-xl overflow-hidden aspect-video bg-black">
+                <iframe
+                  src={`https://www.youtube.com/embed/${embed.embedId}`}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="w-full h-full"
+                  title="Vidéo YouTube"
+                />
+              </div>
+            )
+          }
+          // Autres liens : carte de lien
+          return (
+            <a href={post.link_url!} target="_blank" rel="noopener noreferrer"
+              className="mt-3 flex items-center gap-3 border border-blue-100 bg-blue-50 rounded-xl px-4 py-3 hover:bg-blue-100 transition-colors group">
+              <div className="text-2xl flex-shrink-0">🔗</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-blue-700 truncate">{post.link_url}</p>
+                <p className="text-xs text-blue-400">Ouvrir le lien →</p>
+              </div>
+            </a>
+          )
+        })()}
 
         {post.document_url && post.document_name && (
           <a
@@ -428,7 +489,7 @@ function PostCard({
 }
 
 // ─── FeedClient ──────────────────────────────────────────────────────────────
-export default function FeedClient({ posts: initialPosts, currentUserId, currentUserAvatar, currentUserName, stories = [], isAdmin = false, hasBio = true, hasAvatar = true }: Props) {
+export default function FeedClient({ posts: initialPosts, currentUserId, currentUserAvatar, currentUserName, stories = [], isAdmin = false, hasBio = true, hasAvatar = true, caisseMontant = null }: Props) {
   const router = useRouter()
   const [posts, setPosts] = useState<FeedPost[]>(initialPosts)
   const [likedSet, setLikedSet] = useState<Set<string>>(
@@ -465,6 +526,10 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
   }, [initialPosts, syncServerData])
   const [newContent, setNewContent] = useState('')
   const [selectedMedia, setSelectedMedia] = useState<File | null>(null)
+  const [selectedImages, setSelectedImages] = useState<File[]>([]) // multi-image
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]) // previews multi
+  const [linkUrl, setLinkUrl] = useState('')                        // lien vidéo
+  const [showLinkInput, setShowLinkInput] = useState(false)
   const [mediaMode, setMediaMode] = useState<MediaMode>(null)
   const [mediaPreview, setMediaPreview] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
@@ -487,10 +552,38 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
   const hasDoubleExtension = (name: string) => /\.[a-z]{2,4}\.[a-z]{2,4}$/i.test(name)
 
   const handleMediaSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const files = e.target.files
+    if (!files || files.length === 0) return
     setUploadError(null)
 
+    // Multi-image : plusieurs fichiers image sélectionnés
+    if (files.length > 1 || (files.length === 1 && files[0].type.startsWith('image/'))) {
+      const newFiles = Array.from(files).filter(f => f.type.startsWith('image/')).slice(0, 6)
+      if (newFiles.some(f => hasDoubleExtension(f.name))) {
+        setUploadError('Nom de fichier invalide.')
+        e.target.value = ''
+        return
+      }
+      const combined = [...selectedImages, ...newFiles].slice(0, 6)
+      setSelectedImages(combined)
+      setMediaMode('multi-image')
+      // Générer les previews
+      const previews: string[] = []
+      let loaded = 0
+      combined.forEach((f, i) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          previews[i] = reader.result as string
+          loaded++
+          if (loaded === combined.length) setImagePreviews([...previews])
+        }
+        reader.readAsDataURL(f)
+      })
+      return
+    }
+
+    const file = files[0]
+    if (!file) return
     if (hasDoubleExtension(file.name)) {
       setUploadError('Nom de fichier invalide.')
       e.target.value = ''
@@ -542,9 +635,20 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
     setMediaPreview(null)
   }
 
+  const removeImage = (idx: number) => {
+    const updated = selectedImages.filter((_, i) => i !== idx)
+    setSelectedImages(updated)
+    setImagePreviews(prev => prev.filter((_, i) => i !== idx))
+    if (updated.length === 0) setMediaMode(null)
+  }
+
   const clearMedia = () => {
     if (mediaPreview && mediaMode === 'video') URL.revokeObjectURL(mediaPreview)
     setSelectedMedia(null)
+    setSelectedImages([])
+    setImagePreviews([])
+    setLinkUrl('')
+    setShowLinkInput(false)
     setMediaMode(null)
     setMediaPreview(null)
     setUploadError(null)
@@ -554,20 +658,27 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
   }
 
   const myName = `${currentUserName.prenom} ${currentUserName.nom}`.trim() || 'Moi'
-  const canPost = (newContent.trim().length > 0 || !!selectedMedia) && !isPosting
+  const trimmedLink = linkUrl.trim()
+  const hasContent = newContent.trim().length > 0 || !!selectedMedia || selectedImages.length > 0 || trimmedLink.length > 0
+  const canPost = hasContent && !isPosting
 
   const handlePost = () => {
     if (!canPost) return
     const content = newContent.trim()
     const fileToUpload = selectedMedia
+    const multiFiles = [...selectedImages]
     const mode = mediaMode
     const preview = mediaPreview
+    const previews = [...imagePreviews]
+    const postLinkUrl = trimmedLink || undefined
 
     const optimisticPost: FeedPost = {
       id: `temp-${Date.now()}`,
       type: 'post',
       content,
       image_url: mode === 'image' ? preview : null,
+      image_urls: mode === 'multi-image' ? previews : null,
+      link_url: postLinkUrl ?? null,
       document_url: mode === 'document' ? '#' : null,
       document_name: mode === 'document' ? fileToUpload?.name ?? null : null,
       is_pinned: false,
@@ -590,8 +701,20 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
         let imageUrl: string | undefined
         let documentUrl: string | undefined
         let documentName: string | undefined
+        let uploadedImageUrls: string[] | undefined
 
-        if (fileToUpload && mode === 'image') {
+        if (mode === 'multi-image' && multiFiles.length > 0) {
+          // Upload toutes les images en parallèle
+          const supabase = createClient()
+          const uploads = await Promise.all(multiFiles.map(async (f, i) => {
+            const blob = await resizeImage(f)
+            const path = `posts/${currentUserId}/${Date.now()}_${i}.jpg`
+            const { error } = await supabase.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg' })
+            if (error) return null
+            return supabase.storage.from('photos').getPublicUrl(path).data.publicUrl
+          }))
+          uploadedImageUrls = uploads.filter(Boolean) as string[]
+        } else if (fileToUpload && mode === 'image') {
           const blob = await resizeImage(fileToUpload)
           const supabase = createClient()
           const path = `posts/${currentUserId}/${Date.now()}.jpg`
@@ -626,7 +749,7 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
           }
         }
 
-        await createPost(content, imageUrl, documentUrl, documentName)
+        await createPost(content, imageUrl, documentUrl, documentName, uploadedImageUrls, postLinkUrl)
         setIsRefreshing(true)
         router.refresh()
         toast.success('Post publié !', 'Ton post est visible par tous les membres.')
@@ -779,19 +902,38 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
                 className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
               />
 
-              {/* Image preview */}
+              {/* Multi-image preview grid */}
+              {mediaMode === 'multi-image' && imagePreviews.length > 0 && (
+                <div className={`mt-2 grid gap-1.5 ${imagePreviews.length === 1 ? 'grid-cols-1' : imagePreviews.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                  {imagePreviews.map((src, i) => (
+                    <div key={i} className="relative rounded-xl overflow-hidden aspect-square bg-gray-100">
+                      <img src={src} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        onClick={() => removeImage(i)}
+                        className="absolute top-1 right-1 bg-gray-800/80 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors"
+                        aria-label="Supprimer"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                  {selectedImages.length < 6 && (
+                    <button
+                      onClick={() => mediaInputRef.current?.click()}
+                      className="aspect-square rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 hover:border-green-400 hover:text-green-500 transition-colors"
+                    >
+                      <ImagePlus size={18} />
+                      <span className="text-xs mt-1">{selectedImages.length}/6</span>
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Image preview (single) */}
               {mediaPreview && mediaMode === 'image' && (
                 <div className="relative mt-2 inline-block">
-                  <img
-                    src={mediaPreview}
-                    alt="Aperçu"
-                    className="max-h-40 rounded-xl object-cover border border-gray-200"
-                  />
-                  <button
-                    onClick={clearMedia}
-                    className="absolute -top-2 -right-2 bg-gray-800 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors"
-                    aria-label="Supprimer l'image"
-                  >
+                  <img src={mediaPreview} alt="Aperçu" className="max-h-40 rounded-xl object-cover border border-gray-200" />
+                  <button onClick={clearMedia} className="absolute -top-2 -right-2 bg-gray-800 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors" aria-label="Supprimer">
                     <X size={14} />
                   </button>
                 </div>
@@ -800,18 +942,8 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
               {/* Video preview */}
               {mediaPreview && mediaMode === 'video' && (
                 <div className="relative mt-2 rounded-xl overflow-hidden bg-black border border-gray-200">
-                  <video
-                    src={mediaPreview}
-                    muted
-                    playsInline
-                    controls
-                    className="max-h-40 w-full object-contain"
-                  />
-                  <button
-                    onClick={clearMedia}
-                    className="absolute top-1 right-1 bg-gray-800/80 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors"
-                    aria-label="Supprimer la vidéo"
-                  >
+                  <video src={mediaPreview} muted playsInline controls className="max-h-40 w-full object-contain" />
+                  <button onClick={clearMedia} className="absolute top-1 right-1 bg-gray-800/80 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors" aria-label="Supprimer">
                     <X size={14} />
                   </button>
                 </div>
@@ -822,40 +954,44 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
                 <div className="mt-2 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
                   <div className="flex-shrink-0">{getDocIcon(selectedMedia.name)}</div>
                   <span className="text-sm text-gray-700 truncate flex-1">{selectedMedia.name}</span>
-                  <button
-                    onClick={clearMedia}
-                    className="text-gray-400 hover:text-red-500 transition-colors"
-                    aria-label="Supprimer le document"
-                  >
-                    <X size={14} />
-                  </button>
+                  <button onClick={clearMedia} className="text-gray-400 hover:text-red-500 transition-colors" aria-label="Supprimer"><X size={14} /></button>
+                </div>
+              )}
+
+              {/* Link input */}
+              {showLinkInput && (
+                <div className="mt-2 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
+                  <span className="text-lg flex-shrink-0">🔗</span>
+                  <input
+                    type="url"
+                    placeholder="Colle ton lien YouTube, TikTok, Instagram…"
+                    value={linkUrl}
+                    onChange={e => setLinkUrl(e.target.value)}
+                    className="flex-1 bg-transparent text-sm text-blue-800 placeholder-blue-300 focus:outline-none"
+                    autoFocus
+                  />
+                  <button onClick={() => { setLinkUrl(''); setShowLinkInput(false) }} className="text-blue-300 hover:text-red-500 transition-colors" aria-label="Supprimer le lien"><X size={14} /></button>
                 </div>
               )}
 
               {/* Upload progress bar */}
               {uploadProgress !== null && (
                 <div className="mt-2 w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                  <div
-                    className="bg-green-500 h-full transition-all duration-300 animate-pulse"
-                    style={{ width: '80%' }}
-                  />
+                  <div className="bg-green-500 h-full transition-all duration-300 animate-pulse" style={{ width: '80%' }} />
                 </div>
               )}
 
-              {uploadError && (
-                <p className="mt-1 text-xs text-red-500">{uploadError}</p>
-              )}
+              {uploadError && <p className="mt-1 text-xs text-red-500">{uploadError}</p>}
 
               <div className="flex items-center justify-between mt-2">
                 <div className="flex items-center gap-1">
                   <p className="text-xs text-gray-400 mr-1">{newContent.length}/2000</p>
                   <button
                     type="button"
-                    onClick={() => { if (!mediaMode) mediaInputRef.current?.click() }}
-                    disabled={!!mediaMode}
+                    onClick={() => { if (mediaMode !== 'document') mediaInputRef.current?.click() }}
+                    disabled={mediaMode === 'document'}
                     className="flex items-center gap-1 text-xs text-gray-400 hover:text-green-600 transition-colors px-2 py-1 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                    aria-label="Ajouter une photo ou vidéo"
-                    title="Photo / Vidéo (max 50 MB)"
+                    title="Photos / Vidéo (sélection multiple jusqu'à 6)"
                   >
                     <ImagePlus size={15} />
                     <span>Média</span>
@@ -864,29 +1000,31 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
                     ref={mediaInputRef}
                     type="file"
                     accept="image/*,video/mp4,video/webm,video/quicktime"
+                    multiple
                     onChange={handleMediaSelect}
                     className="hidden"
-                    aria-label="Sélectionner une image ou vidéo"
+                    aria-label="Sélectionner des images ou une vidéo"
                   />
                   <button
                     type="button"
-                    onClick={() => { if (!mediaMode) docInputRef.current?.click() }}
-                    disabled={!!mediaMode}
+                    onClick={() => { if (mediaMode !== 'multi-image' && mediaMode !== 'image' && mediaMode !== 'video') docInputRef.current?.click() }}
+                    disabled={mediaMode === 'multi-image' || mediaMode === 'image' || mediaMode === 'video'}
                     className="flex items-center gap-1 text-xs text-gray-400 hover:text-green-600 transition-colors px-2 py-1 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                    aria-label="Ajouter un document"
                     title="Document PDF/DOCX/XLSX (max 10 MB)"
                   >
                     <Paperclip size={15} />
-                    <span>Document</span>
+                    <span>Doc</span>
                   </button>
-                  <input
-                    ref={docInputRef}
-                    type="file"
-                    accept=".pdf,.docx,.xlsx,.pptx,.txt"
-                    onChange={handleDocSelect}
-                    className="hidden"
-                    aria-label="Sélectionner un document"
-                  />
+                  <input ref={docInputRef} type="file" accept=".pdf,.docx,.xlsx,.pptx,.txt" onChange={handleDocSelect} className="hidden" aria-label="Sélectionner un document" />
+                  <button
+                    type="button"
+                    onClick={() => setShowLinkInput(v => !v)}
+                    className={`flex items-center gap-1 text-xs transition-colors px-2 py-1 rounded-lg hover:bg-gray-50 ${showLinkInput ? 'text-blue-600' : 'text-gray-400 hover:text-blue-600'}`}
+                    title="Coller un lien (YouTube, TikTok, Instagram…)"
+                  >
+                    <span className="text-base leading-none">🔗</span>
+                    <span>Lien</span>
+                  </button>
                 </div>
                 <button
                   onClick={handlePost}
@@ -900,6 +1038,27 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
             </div>
           </div>
         </div>
+
+        {/* Ticker Caisse */}
+        {caisseMontant !== null && (
+          <div className="overflow-hidden rounded-2xl bg-green-600 text-white py-3 px-4 flex items-center gap-3">
+            <span className="text-xl flex-shrink-0">💰</span>
+            <div className="overflow-hidden flex-1">
+              <div className="whitespace-nowrap animate-[marquee_18s_linear_infinite]" style={{ display: 'inline-block' }}>
+                <span className="font-bold">Caisse UEEMT-Tokat :</span>
+                <span className="ml-2 font-black text-green-100">
+                  {caisseMontant.toLocaleString('fr-FR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 })}
+                </span>
+                <span className="mx-8 text-green-300">•</span>
+                <span className="font-bold">Caisse UEEMT-Tokat :</span>
+                <span className="ml-2 font-black text-green-100">
+                  {caisseMontant.toLocaleString('fr-FR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 })}
+                </span>
+                <span className="mx-8 text-green-300">•</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Pinned posts */}
         {pinnedPosts.map((post, i) => (

@@ -8,6 +8,8 @@ export type FeedPost = {
   type: string
   content: string | null
   image_url: string | null
+  image_urls: string[] | null
+  link_url: string | null
   document_url: string | null
   document_name: string | null
   is_pinned: boolean
@@ -27,7 +29,7 @@ export default async function FeedPage() {
   if (!user) redirect('/connexion')
 
   // Layer 1: myProfile + posts + stories are independent — run in parallel
-  const [{ data: myProfile }, { data: postsData }, stories] = await Promise.all([
+  const [{ data: myProfile }, { data: postsData }, stories, { data: caisseData }] = await Promise.all([
     supabase
       .from('user_profiles')
       .select('id, avatar_url, bio, member_id, role')
@@ -35,11 +37,12 @@ export default async function FeedPage() {
       .maybeSingle(),
     supabase
       .from('posts')
-      .select('id, type, content, image_url, document_url, document_name, is_pinned, created_at, author_id')
+      .select('id, type, content, image_url, image_urls, link_url, document_url, document_name, is_pinned, created_at, author_id')
       .order('is_pinned', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(50),
     getActiveStories().catch(() => []),
+    (async () => { try { return await supabase.from('caisse').select('montant, cotisation_mensuelle').single() } catch { return { data: null as { montant: number; cotisation_mensuelle: number } | null } } })(),
   ])
 
   const postIds = (postsData ?? []).map(p => p.id)
@@ -93,12 +96,21 @@ export default async function FeedPage() {
   const memberMap = Object.fromEntries(membersData.map(m => [m.id, m]))
 
   const posts: FeedPost[] = (postsData ?? []).map(p => {
+    const raw = p as Record<string, unknown>
     const prof = profileMap[p.author_id]
     const mem = prof?.member_id ? memberMap[prof.member_id] : null
     return {
-      ...p,
-      document_url: p.document_url ?? null,
-      document_name: p.document_name ?? null,
+      id: p.id,
+      type: p.type,
+      content: raw.content as string | null ?? null,
+      image_url: raw.image_url as string | null ?? null,
+      image_urls: raw.image_urls as string[] | null ?? null,
+      link_url: raw.link_url as string | null ?? null,
+      document_url: raw.document_url as string | null ?? null,
+      document_name: raw.document_name as string | null ?? null,
+      is_pinned: p.is_pinned,
+      created_at: p.created_at,
+      author_id: p.author_id,
       author_prenom: mem?.prenom ?? 'Membre',
       author_nom: mem?.nom ?? '',
       author_avatar: prof?.avatar_url ?? null,
@@ -108,9 +120,10 @@ export default async function FeedPage() {
     }
   })
 
-  const isAdmin = myProfile?.role === 'admin'
+  const isAdmin = myProfile?.role === 'admin' || myProfile?.role === 'president'
   const hasBio = !!((myProfile as { bio?: string | null } | null)?.bio?.trim())
   const hasAvatar = !!(myProfile?.avatar_url)
+  const caisseMontant = (caisseData as { montant?: number } | null)?.montant ?? null
 
   return (
     <FeedClient
@@ -122,6 +135,7 @@ export default async function FeedPage() {
       isAdmin={isAdmin}
       hasBio={hasBio}
       hasAvatar={hasAvatar}
+      caisseMontant={caisseMontant}
     />
   )
 }
