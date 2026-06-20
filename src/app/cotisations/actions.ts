@@ -43,7 +43,7 @@ async function requireTresorierOrAdmin(supabase: Awaited<ReturnType<typeof creat
     .select('role')
     .eq('id', userId)
     .single()
-  if (!data || !['admin', 'tresorier', 'adjoint_tresorier'].includes(data.role)) {
+  if (!data || !['admin', 'tresorier', 'adjoint_tresorier', 'caissier'].includes(data.role)) {
     throw new Error('Accès refusé')
   }
   return data.role as string
@@ -60,7 +60,7 @@ export async function getCaisseInfo(): Promise<CaisseInfo> {
     .eq('id', 1)
     .single()
 
-  if (error || !data) return { montant: 1000, cotisation_mensuelle: 50 }
+  if (error || !data) return { montant: 2000, cotisation_mensuelle: 50 }
   return { montant: Number(data.montant), cotisation_mensuelle: Number(data.cotisation_mensuelle) }
 }
 
@@ -245,9 +245,7 @@ export async function updateCotisationMensuelle(montant: number) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/connexion')
 
-  // admin only
-  const { data } = await supabase.from('user_profiles').select('role').eq('id', user.id).single()
-  if (data?.role !== 'admin') throw new Error('Admin uniquement')
+  await requireTresorierOrAdmin(supabase, user.id)
 
   if (montant <= 0) throw new Error('Montant invalide')
 
@@ -259,6 +257,32 @@ export async function updateCotisationMensuelle(montant: number) {
   if (error) {
     console.error('[updateCotisationMensuelle]', error.code)
     throw new Error('Impossible de mettre à jour la cotisation mensuelle.')
+  }
+}
+
+export async function mettreAJourMontants(cotisation_mensuelle: number, montant_caisse: number) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/connexion')
+
+  await requireTresorierOrAdmin(supabase, user.id)
+
+  if (cotisation_mensuelle <= 0) throw new Error('Cotisation mensuelle invalide')
+  if (montant_caisse < 0) throw new Error('Montant caisse invalide')
+
+  const { error } = await supabase
+    .from('caisse')
+    .update({
+      cotisation_mensuelle,
+      montant: montant_caisse,
+      updated_at: new Date().toISOString(),
+      updated_by: user.id,
+    })
+    .eq('id', 1)
+
+  if (error) {
+    console.error('[mettreAJourMontants]', error.code)
+    throw new Error('Impossible de mettre à jour les montants.')
   }
 }
 

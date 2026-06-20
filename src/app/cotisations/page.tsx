@@ -20,7 +20,7 @@ export default async function CotisationsPage() {
     .single()
 
   const role = profile?.role ?? 'member'
-  const isGestionnaire = ['admin', 'tresorier', 'adjoint_tresorier'].includes(role)
+  const isGestionnaire = ['admin', 'tresorier', 'adjoint_tresorier', 'caissier'].includes(role)
 
   const [caisseInfo, maCotisation, historique, allCotisations] = await Promise.all([
     getCaisseInfo(),
