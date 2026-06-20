@@ -11,6 +11,7 @@ import type { StoryData } from '@/app/feed/stories-actions'
 import StoriesRow from '@/components/StoriesRow'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { useModal } from '@/hooks/useModal'
+import { usePresence } from '@/hooks/usePresence'
 import { toast } from '@/lib/toast'
 
 // TODO: Pour les vidéos volumineuses en production, migrer vers Cloudflare R2 (10 GB gratuit)
@@ -689,6 +690,12 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
   const pinnedPosts = posts.filter(p => p.is_pinned)
   const regularPosts = posts.filter(p => !p.is_pinned)
 
+  const { count: onlineCount, others: onlineOthers } = usePresence(
+    currentUserId,
+    currentUserName.prenom,
+    currentUserName.nom,
+  )
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-green-600 text-white py-12 relative overflow-hidden">
@@ -700,6 +707,19 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
         <div className="max-w-2xl mx-auto px-4">
           <p className="text-green-200 text-sm uppercase tracking-widest mb-1">Espace membres</p>
           <h1 className="text-3xl font-black">Fil d&apos;actualité</h1>
+          {onlineCount > 0 && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="inline-block w-2 h-2 bg-green-300 rounded-full animate-pulse flex-shrink-0" />
+              <span className="text-green-100 text-sm">
+                {onlineCount === 1
+                  ? 'Toi seul(e) en ligne'
+                  : onlineOthers.length === 0
+                    ? `${onlineCount} membres en ligne`
+                    : `${onlineCount} membres en ligne — ${onlineOthers.slice(0, 3).map(u => u.prenom).join(', ')}${onlineOthers.length > 3 ? ` +${onlineOthers.length - 3}` : ''}`
+                }
+              </span>
+            </div>
+          )}
         </div>
       </header>
 
