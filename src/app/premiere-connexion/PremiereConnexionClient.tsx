@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { ArrowLeft, Lock, Eye, EyeOff, Search, CheckCircle, Loader2, Mail, ShieldCheck } from 'lucide-react'
 import { verifierEmailEtEnvoyerOTP, verifierOTP, definirMotDePasseApresOTP } from './actions'
 import { broadcastSocialEvent } from '@/lib/broadcast'
+import { createClient } from '@/lib/supabase/client'
 
 type Membre = { id: string; prenom: string; nom: string; nom_complet: string; filiere: string | null }
 type Step = 'liste' | 'email' | 'otp' | 'password' | 'succes'
@@ -60,6 +61,14 @@ export default function PremiereConnexionClient() {
       setLoadingMembres(false)
     }
   }
+
+  // Redirect if already logged in
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser()
+      .then(({ data: { user } }) => { if (user) router.replace('/feed') })
+      .catch(() => {})
+  }, [router])
 
   useEffect(() => { void fetchMembres() }, [])
 

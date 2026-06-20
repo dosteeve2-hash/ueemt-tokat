@@ -68,6 +68,13 @@ export default function ProfilClient({ profile, member, userId }: Props) {
   const [isPending, startTransition] = useTransition()
   const fileRef = useRef<HTMLInputElement>(null)
 
+  // Si le profil est déjà complet (avatar + bio), on marque l'onboarding comme terminé
+  useEffect(() => {
+    if (profile?.avatar_url && profile?.bio) {
+      try { localStorage.setItem('ueemt_onboarding_done', '1') } catch { /* noop */ }
+    }
+  }, [profile?.avatar_url, profile?.bio])
+
   const initials = member
     ? `${member.prenom?.[0] ?? ''}${member.nom?.[0] ?? ''}`.toUpperCase()
     : '?'
@@ -128,6 +135,9 @@ export default function ProfilClient({ profile, member, userId }: Props) {
       await updateProfile(fd)
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
+
+      // Marquer l'onboarding comme terminé dès que l'utilisateur sauvegarde son profil
+      try { localStorage.setItem('ueemt_onboarding_done', '1') } catch { /* noop */ }
 
       // Broadcast "profile completed" when bio is set for the first time
       const newBio = (fd.get('bio') as string | null)?.trim() ?? ''

@@ -499,6 +499,17 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
     Object.fromEntries(initialPosts.map(p => [p.id, p.likes_count]))
   )
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [profileNudgeDismissed, setProfileNudgeDismissed] = useState(true) // true par défaut → pas de flash
+
+  // Lire le flag localStorage pour masquer le nudge profil
+  useEffect(() => {
+    try {
+      const done = localStorage.getItem('ueemt_onboarding_done') === '1'
+      setProfileNudgeDismissed(done || (hasBio && hasAvatar))
+    } catch {
+      setProfileNudgeDismissed(hasBio && hasAvatar)
+    }
+  }, [hasBio, hasAvatar])
   const deleteModal = useModal()
   const [postToDelete, setPostToDelete] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -859,8 +870,8 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
           <StoriesRow stories={stories} isAdmin={isAdmin} currentUserId={currentUserId} />
         )}
 
-        {/* Nudge profil incomplet — encouragement discret */}
-        {(!hasBio || !hasAvatar) && (
+        {/* Nudge profil incomplet — masqué si déjà complété une fois */}
+        {!profileNudgeDismissed && (!hasBio || !hasAvatar) && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-4">
             <span className="text-2xl flex-shrink-0">👤</span>
             <div className="flex-1 min-w-0">
@@ -1093,6 +1104,51 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
             >
               ✍️ Créer le premier post
             </button>
+          </div>
+        )}
+
+        {/* Teasers — quand le feed est peu actif, on montre ce qu'il y a à explorer */}
+        {regularPosts.length < 3 && (
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-1">
+              Explorer l&apos;UEEMT-Tokat
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <Link href="/membres" className="group bg-white rounded-2xl border border-gray-100 p-4 flex flex-col items-center text-center hover:border-green-300 hover:bg-green-50 transition-all shadow-sm">
+                <span className="text-3xl mb-2 group-hover:scale-110 transition-transform">👥</span>
+                <p className="font-bold text-gray-900 text-sm">Membres</p>
+                <p className="text-xs text-gray-400 mt-0.5">Retrouve tes camarades</p>
+              </Link>
+              <Link href="/activites" className="group bg-white rounded-2xl border border-gray-100 p-4 flex flex-col items-center text-center hover:border-green-300 hover:bg-green-50 transition-all shadow-sm">
+                <span className="text-3xl mb-2 group-hover:scale-110 transition-transform">📸</span>
+                <p className="font-bold text-gray-900 text-sm">Albums photos</p>
+                <p className="text-xs text-gray-400 mt-0.5">Nos souvenirs ensemble</p>
+              </Link>
+              <Link href="/cotisations" className="group bg-white rounded-2xl border border-gray-100 p-4 flex flex-col items-center text-center hover:border-green-300 hover:bg-green-50 transition-all shadow-sm">
+                <span className="text-3xl mb-2 group-hover:scale-110 transition-transform">💰</span>
+                <p className="font-bold text-gray-900 text-sm">Cotisations</p>
+                <p className="text-xs text-gray-400 mt-0.5">Mon statut & la caisse</p>
+              </Link>
+              <Link href="/profil" className="group bg-white rounded-2xl border border-gray-100 p-4 flex flex-col items-center text-center hover:border-green-300 hover:bg-green-50 transition-all shadow-sm">
+                <span className="text-3xl mb-2 group-hover:scale-110 transition-transform">✏️</span>
+                <p className="font-bold text-gray-900 text-sm">Mon profil</p>
+                <p className="text-xs text-gray-400 mt-0.5">Photo & présentation</p>
+              </Link>
+            </div>
+
+            {/* Welcome card */}
+            <div className="bg-gradient-to-br from-green-600 to-green-500 rounded-2xl p-5 text-white shadow-sm">
+              <p className="font-black text-lg leading-tight mb-1">🇲🇱 Bienvenue dans la famille !</p>
+              <p className="text-green-100 text-sm leading-relaxed">
+                Partage des photos, des vidéos, des documents — tout ce qui fait vivre la communauté UEEMT-Tokat.
+              </p>
+              <button
+                onClick={() => textareaRef.current?.focus()}
+                className="mt-3 bg-white text-green-700 px-4 py-2 rounded-full font-bold text-sm hover:bg-green-50 transition-colors"
+              >
+                Dire bonjour 👋
+              </button>
+            </div>
           </div>
         )}
 

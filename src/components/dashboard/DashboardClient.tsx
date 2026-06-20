@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { User, FileText, Image, Calendar, CheckCircle, Circle } from 'lucide-react'
 import ProfileTab from './ProfileTab'
@@ -46,7 +46,24 @@ const TABS = [
 
 export default function DashboardClient({ user, profile, documents, albums }: Props) {
   const [activeTab, setActiveTab] = useState('profil')
+  const [onboardingDone, setOnboardingDone] = useState(true) // true par défaut pour éviter flash
   const member = profile.member
+
+  // Lire le flag localStorage côté client (SSR-safe)
+  useEffect(() => {
+    try {
+      const done = localStorage.getItem('ueemt_onboarding_done') === '1'
+      // Marquer comme terminé aussi si avatar + bio déjà remplis
+      if (profile.avatar_url && profile.bio) {
+        localStorage.setItem('ueemt_onboarding_done', '1')
+        setOnboardingDone(true)
+      } else {
+        setOnboardingDone(done)
+      }
+    } catch {
+      setOnboardingDone(!(!profile.bio || !profile.avatar_url))
+    }
+  }, [profile.avatar_url, profile.bio])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -73,8 +90,8 @@ export default function DashboardClient({ user, profile, documents, albums }: Pr
       </header>
 
       <div className="max-w-5xl mx-auto px-4 py-5 sm:py-6">
-        {/* Onboarding checklist */}
-        {(!profile.bio || !profile.avatar_url) && (
+        {/* Onboarding checklist — masqué une fois complété (localStorage) */}
+        {!onboardingDone && (!profile.bio || !profile.avatar_url) && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-5">
             <p className="font-bold text-amber-800 mb-3">👋 Bienvenue ! Voici tes premières étapes :</p>
             <ul className="space-y-2.5">

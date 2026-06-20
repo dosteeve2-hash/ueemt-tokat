@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { Menu, X, LayoutDashboard, LogOut, Rss, User, Sun, Moon, Search, Coins, CalendarDays, Bell, Home, Users, ChevronRight } from 'lucide-react'
+import { Menu, X, LayoutDashboard, LogOut, Rss, User, Sun, Moon, Search, Coins, CalendarDays, Bell, Home, Users, ChevronRight, ShoppingBag } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { createClient } from '@/lib/supabase/client'
@@ -129,6 +129,7 @@ export default function Navbar() {
     { href: '/feed', label: t('nav.feed'), icon: Rss },
     { href: '/membres', label: t('nav.members'), icon: Users },
     { href: '/evenements', label: 'Événements', icon: CalendarDays },
+    { href: '/marketplace', label: 'Marketplace', icon: ShoppingBag },
     { href: '/cotisations', label: t('nav.cotisations'), icon: Coins },
     { href: '/activites', label: t('nav.activities'), icon: ChevronRight },
     { href: '/notifications', label: 'Notifications', icon: Bell },
