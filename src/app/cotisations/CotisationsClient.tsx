@@ -11,8 +11,7 @@ import type {
 import {
   marquerPaye,
   annulerPaiement,
-  updateCaisse,
-  updateCotisationMensuelle,
+  mettreAJourMontants,
   getAllCotisations,
   envoyerRappels,
 } from './actions'
@@ -53,10 +52,12 @@ function MonStatutBadge({ paid }: { paid: boolean }) {
 function TableauCotisations({
   initial,
   cotisationMensuelle,
+  montantCaisse,
   isAdmin,
 }: {
   initial: CotisationRow[]
   cotisationMensuelle: number
+  montantCaisse: number
   isAdmin: boolean
 }) {
   const [rows, setRows] = useState<CotisationRow[]>(initial)
@@ -114,10 +115,12 @@ function TableauCotisations({
   }
 
   const handleSaveConfig = async () => {
+    if (!newCaisse && !newCotis) return
     setSavingConfig(true)
     try {
-      if (newCaisse !== '') await updateCaisse(parseFloat(newCaisse))
-      if (newCotis !== '' && isAdmin) await updateCotisationMensuelle(parseFloat(newCotis))
+      const caisseVal = newCaisse !== '' ? parseFloat(newCaisse) : montantCaisse
+      const cotisVal = newCotis !== '' ? parseFloat(newCotis) : cotisationMensuelle
+      await mettreAJourMontants(cotisVal, caisseVal)
       setNewCaisse('')
       setNewCotis('')
     } catch (e) {
@@ -199,18 +202,16 @@ function TableauCotisations({
               className="w-full border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-green-500"
             />
           </div>
-          {isAdmin && (
-            <div>
-              <label className="text-xs text-gray-500 dark:text-slate-400 block mb-1">Cotisation mensuelle (₺)</label>
-              <input
-                type="number"
-                value={newCotis}
-                onChange={e => setNewCotis(e.target.value)}
-                placeholder="Ex: 50"
-                className="w-full border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-          )}
+          <div>
+            <label className="text-xs text-gray-500 dark:text-slate-400 block mb-1">Cotisation mensuelle (₺)</label>
+            <input
+              type="number"
+              value={newCotis}
+              onChange={e => setNewCotis(e.target.value)}
+              placeholder="Ex: 50"
+              className="w-full border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+          </div>
         </div>
         <button
           onClick={handleSaveConfig}
@@ -378,6 +379,7 @@ export default function CotisationsClient({
     admin: 'Administrateur',
     tresorier: 'Trésorier',
     adjoint_tresorier: 'Trésorier Adjoint',
+    caissier: 'Caissier',
     member: 'Membre',
   }
 
@@ -502,6 +504,7 @@ export default function CotisationsClient({
             <TableauCotisations
               initial={allCotisations}
               cotisationMensuelle={caisse.cotisation_mensuelle}
+              montantCaisse={caisse.montant}
               isAdmin={role === 'admin'}
             />
           </div>
