@@ -110,7 +110,7 @@ export async function signInWithPassword(
       return { error: 'Email ou mot de passe incorrect.' }
     }
     if (error.message.includes('Email not confirmed')) {
-      return { error: 'Email non confirmé. Contactez un administrateur UEEMT.' }
+      return { error: 'Email non confirmé. Utilise le lien de connexion reçu par email, ou réessaie via /premiere-connexion.' }
     }
     return { error: error.message }
   }
@@ -313,7 +313,7 @@ export async function creerMotDePasseEtConnecter(
   const hasValidServiceKey = serviceKey.startsWith('eyJ')
 
   if (!hasValidServiceKey) {
-    return { error: 'Configuration serveur manquante. Contacte un administrateur.' }
+    return { error: 'Erreur de configuration serveur. Réessaie dans quelques instants.' }
   }
 
   const admin = createAdminClient(supabaseUrl, serviceKey, {
@@ -357,7 +357,7 @@ export async function creerMotDePasseEtConnecter(
     )
 
     if (!existingUser) {
-      return { error: 'Impossible de trouver le compte. Contacte un administrateur.' }
+      return { error: 'Compte introuvable. Recense-toi sur /recensement puis réessaie.' }
     }
 
     const { error: updateError } = await admin.auth.admin.updateUserById(existingUser.id, {

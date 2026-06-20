@@ -42,7 +42,7 @@ export async function creerCompteEtConnecter(
   const hasValidServiceKey = serviceKey.startsWith('eyJ')
 
   if (!hasValidServiceKey) {
-    return { error: 'Configuration serveur manquante. Contacte un administrateur.' }
+    return { error: 'Erreur de configuration serveur. Réessaie dans quelques instants.' }
   }
 
   const admin = createAdminClient(supabaseUrl, serviceKey, {
@@ -58,7 +58,7 @@ export async function creerCompteEtConnecter(
     .single()
 
   if (fetchError || !member?.email) {
-    return { error: 'Membre introuvable ou compte désactivé. Contacte un administrateur.' }
+    return { error: 'Membre introuvable ou compte désactivé. Vérifie que tu es bien recensé(e) sur /recensement.' }
   }
 
   const normalizedEmail = (member.email as string).trim().toLowerCase()
@@ -88,7 +88,7 @@ export async function creerCompteEtConnecter(
     )
 
     if (!existingUser) {
-      return { error: 'Impossible de trouver le compte. Contacte un administrateur.' }
+      return { error: 'Compte introuvable. Recense-toi sur /recensement puis réessaie.' }
     }
 
     const { error: updateError } = await admin.auth.admin.updateUserById(existingUser.id, {
