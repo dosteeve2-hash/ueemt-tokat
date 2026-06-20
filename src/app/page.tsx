@@ -1,8 +1,18 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { Users, MapPin, Calendar, Award } from 'lucide-react'
 import { BUREAU_MEMBERS } from '@/lib/constants'
 import HeroSlideshow from '@/components/HeroSlideshow'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const d = Math.floor(diff / 86_400_000)
+  if (d < 1) return "aujourd'hui"
+  if (d < 7) return `il y a ${d}j`
+  return new Date(dateStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+}
 
 export default async function HomePage() {
   let heroPhotos: string[] = []
@@ -11,6 +21,7 @@ export default async function HomePage() {
   let heroTagline = 'Travail – Solidarité – Réussite'
   let isLoggedIn = false
 
+  // ─── Données hero + auth (client anon) ───────────────────────────────────
   try {
     const supabase = await createClient()
     const [{ data: settings }, { data: { user } }] = await Promise.all([
@@ -29,6 +40,63 @@ export default async function HomePage() {
     }
   } catch {}
 
+  // ─── Données publiques (admin client, bypass RLS) ─────────────────────────
+  let memberCount = 36
+  let recentPhotos: Array<{ id: string; url: string; caption: string | null }> = []
+  let recentPosts: Array<{ id: string; content: string; created_at: string; prenom: string | null; nom: string | null }> = []
+  let memberAvatars: Array<{ id: string; prenom: string; nom: string }> = []
+
+  try {
+    const admin = createAdminClient()
+
+    const [
+      { count },
+      { data: photos },
+      { data: posts },
+      { data: members },
+    ] = await Promise.all([
+      admin.from('members').select('*', { count: 'exact', head: true }).eq('is_active', true),
+      admin.from('photos').select('id, url, caption').order('created_at', { ascending: false }).limit(6),
+      admin.from('posts').select('id, content, created_at, author_id').order('created_at', { ascending: false }).limit(3),
+      admin.from('members').select('id, prenom, nom').eq('is_active', true).order('created_at', { ascending: false }).limit(8),
+    ])
+
+    if (count) memberCount = count
+    if (photos) recentPhotos = photos as typeof recentPhotos
+    if (members) memberAvatars = members as typeof memberAvatars
+
+    // Enrichir les posts avec les noms d'auteurs
+    if (posts && posts.length > 0) {
+      const authorIds = posts.map((p) => p.author_id as string).filter(Boolean)
+      const { data: profiles } = await admin
+        .from('user_profiles')
+        .select('id, member_id')
+        .in('id', authorIds)
+
+      const memberIds = (profiles ?? []).map((p) => p.member_id as string).filter(Boolean)
+      const { data: postMembers } = memberIds.length > 0
+        ? await admin.from('members').select('id, prenom, nom').in('id', memberIds)
+        : { data: [] }
+
+      const profileMap = new Map((profiles ?? []).map((p) => [p.id as string, p.member_id as string]))
+      const memberMap = new Map((postMembers ?? []).map((m) => [m.id as string, { prenom: m.prenom as string, nom: m.nom as string }]))
+
+      recentPosts = posts.map((p) => {
+        const memberId = profileMap.get(p.author_id as string)
+        const author = memberId ? memberMap.get(memberId) : null
+        return {
+          id: p.id as string,
+          content: p.content as string,
+          created_at: p.created_at as string,
+          prenom: author?.prenom ?? null,
+          nom: author?.nom ?? null,
+        }
+      })
+    }
+  } catch {}
+
+  const AVATAR_COLORS = ['bg-green-600', 'bg-yellow-500', 'bg-teal-600', 'bg-blue-600', 'bg-purple-600', 'bg-red-500', 'bg-indigo-600', 'bg-orange-500']
+
   return (
     <>
       <HeroSlideshow
@@ -42,7 +110,7 @@ export default async function HomePage() {
       <section className="bg-green-600 text-white py-6">
         <div className="max-w-7xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
           {[
-            { icon: Users, value: '34', label: 'Membres' },
+            { icon: Users, value: String(memberCount), label: 'Membres' },
             { icon: MapPin, value: '1', label: 'Ville' },
             { icon: Calendar, value: 'Depuis 2022', label: 'Fondée' },
             { icon: Award, value: 'Tokat', label: 'Türkiye' },
@@ -55,6 +123,141 @@ export default async function HomePage() {
           ))}
         </div>
       </section>
+
+      {/* ── Section membres actifs ── */}
+      <section className="py-14 bg-white">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="text-center mb-8">
+            <span className="text-green-600 font-semibold text-sm uppercase tracking-widest">Communauté</span>
+            <h2 className="text-2xl sm:text-3xl font-bold mt-2 text-gray-900">
+              {memberCount} membres actifs à Tokat
+            </h2>
+            <p className="text-gray-500 text-sm mt-2">Maliens unis, loin du pays mais jamais seuls.</p>
+          </div>
+
+          {memberAvatars.length > 0 ? (
+            <div className="flex flex-wrap justify-center gap-3 mb-8">
+              {memberAvatars.map((m, i) => (
+                <div
+                  key={m.id}
+                  title={`${m.prenom} ${m.nom}`}
+                  className={`w-12 h-12 rounded-full ${AVATAR_COLORS[i % AVATAR_COLORS.length]} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}
+                >
+                  {(m.prenom?.[0] ?? '').toUpperCase()}{(m.nom?.[0] ?? '').toUpperCase()}
+                </div>
+              ))}
+              {memberCount > memberAvatars.length && (
+                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-xs">
+                  +{memberCount - memberAvatars.length}
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          <div className="text-center">
+            <Link
+              href="/membres"
+              className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-semibold inline-block transition-colors"
+            >
+              Voir tous les membres →
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Section dernières photos ── */}
+      {recentPhotos.length > 0 && (
+        <section className="py-14 bg-gray-50">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="text-center mb-8">
+              <span className="text-green-600 font-semibold text-sm uppercase tracking-widest">Galerie</span>
+              <h2 className="text-2xl sm:text-3xl font-bold mt-2 text-gray-900">Nos derniers moments</h2>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+              {recentPhotos.map((photo) => (
+                <div key={photo.id} className="relative aspect-square rounded-2xl overflow-hidden bg-gray-200 group">
+                  <Image
+                    src={photo.url}
+                    alt={photo.caption ?? 'Photo UEEMT'}
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-300"
+                    sizes="(max-width: 640px) 50vw, 33vw"
+                  />
+                  {photo.caption && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <p className="text-white text-xs line-clamp-2">{photo.caption}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="text-center mt-8">
+              <Link
+                href="/activites"
+                className="bg-white border-2 border-green-600 text-green-600 hover:bg-green-50 px-8 py-3 rounded-full font-semibold inline-block transition-colors"
+              >
+                Voir tous les albums →
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── Section posts récents ── */}
+      {recentPosts.length > 0 ? (
+        <section className="py-14 bg-white">
+          <div className="max-w-4xl mx-auto px-4">
+            <div className="text-center mb-8">
+              <span className="text-green-600 font-semibold text-sm uppercase tracking-widest">Actualités</span>
+              <h2 className="text-2xl sm:text-3xl font-bold mt-2 text-gray-900">Dernières nouvelles</h2>
+            </div>
+            <div className="space-y-4">
+              {recentPosts.map((post) => (
+                <div key={post.id} className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-9 h-9 rounded-full bg-green-600 flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
+                      {post.prenom?.[0]?.toUpperCase() ?? 'U'}{post.nom?.[0]?.toUpperCase() ?? 'E'}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900 text-sm">
+                        {post.prenom && post.nom ? `${post.prenom} ${post.nom}` : 'Membre UEEMT'}
+                      </p>
+                      <p className="text-gray-400 text-xs">{timeAgo(post.created_at)}</p>
+                    </div>
+                  </div>
+                  <p className="text-gray-700 text-sm leading-relaxed line-clamp-3">
+                    {post.content?.slice(0, 150)}{(post.content?.length ?? 0) > 150 ? '…' : ''}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <div className="text-center mt-8">
+              <p className="text-gray-500 text-sm mb-4">Connecte-toi pour voir tous les posts, liker et commenter.</p>
+              <Link
+                href="/connexion"
+                className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-semibold inline-block transition-colors"
+              >
+                Rejoins-nous pour voir plus →
+              </Link>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section className="py-14 bg-white">
+          <div className="max-w-4xl mx-auto px-4">
+            <div className="rounded-2xl border p-16 text-center">
+              <div className="text-5xl mb-4">📰</div>
+              <h3 className="text-xl font-bold mb-2 text-gray-900">Le fil d&apos;actu arrive bientôt</h3>
+              <p className="text-gray-500 text-sm mb-6 max-w-sm mx-auto">
+                Les membres partagent bientôt leurs actualités. Rejoins la communauté !
+              </p>
+              <Link href="/recensement" className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-full font-semibold inline-block">
+                Se recenser →
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Values */}
       <section className="py-16 sm:py-20 bg-gray-50">
