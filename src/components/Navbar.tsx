@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { Menu, X, LayoutDashboard, LogOut, Rss, User, Sun, Moon, Search, Bell, Coins } from 'lucide-react'
+import { Menu, X, LayoutDashboard, LogOut, Rss, User, Sun, Moon, Search, Coins, CalendarDays, Bell } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { createClient } from '@/lib/supabase/client'
@@ -166,6 +166,13 @@ export default function Navbar() {
                   <Coins size={14} />
                   {t('nav.cotisations')}
                 </Link>
+                <Link
+                  href="/evenements"
+                  className="flex items-center gap-1.5 text-gray-700 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-400 font-medium transition-colors text-sm"
+                >
+                  <CalendarDays size={14} />
+                  Événements
+                </Link>
               </>
             )}
 
@@ -277,6 +284,13 @@ export default function Navbar() {
                     onClick={() => setOpen(false)}
                   >
                     <Coins size={16} /> {t('nav.cotisations')}
+                  </Link>
+                  <Link
+                    href="/evenements"
+                    className="flex items-center gap-2 text-gray-700 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-400 hover:bg-gray-50 dark:hover:bg-slate-800 font-medium py-3 px-2 rounded-lg"
+                    onClick={() => setOpen(false)}
+                  >
+                    <CalendarDays size={16} /> Événements ⚽
                   </Link>
                   <Link
                     href="/notifications"
