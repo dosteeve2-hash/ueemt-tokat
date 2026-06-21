@@ -3,7 +3,7 @@
 import { useState, useTransition, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Heart, Trash2, Megaphone, Send, Loader2, MessageCircle, ChevronDown, ChevronUp, ImagePlus, X, Share2, Check, Paperclip, FileText, FileSpreadsheet, Presentation, File } from 'lucide-react'
-import { createPost, deletePost, toggleLike, addComment, deleteComment, getCommentsWithAuthors } from '@/app/feed/actions'
+import { createPost, deletePost, toggleLike, addComment, deleteComment, getCommentsWithAuthors, lierMembreAction } from '@/app/feed/actions'
 import { getFiliereBadge } from '@/lib/filiereBadge'
 import { createClient } from '@/lib/supabase/client'
 import type { FeedPost } from '@/app/feed/page'
@@ -61,6 +61,8 @@ interface Props {
   hasBio?: boolean
   hasAvatar?: boolean
   caisseMontant?: number | null
+  cotisationMensuelle?: number | null
+  suggestedMember?: { id: string; prenom: string; nom: string } | null
 }
 
 type MediaMode = 'image' | 'video' | 'document' | 'multi-image' | null
@@ -501,7 +503,7 @@ function PostCard({
 }
 
 // ─── FeedClient ──────────────────────────────────────────────────────────────
-export default function FeedClient({ posts: initialPosts, currentUserId, currentUserAvatar, currentUserName, stories = [], isAdmin = false, hasBio = true, hasAvatar = true, caisseMontant = null }: Props) {
+export default function FeedClient({ posts: initialPosts, currentUserId, currentUserAvatar, currentUserName, stories = [], isAdmin = false, hasBio = true, hasAvatar = true, caisseMontant = null, cotisationMensuelle = null, suggestedMember = null }: Props) {
   const router = useRouter()
   const [posts, setPosts] = useState<FeedPost[]>(initialPosts)
   const [likedSet, setLikedSet] = useState<Set<string>>(
@@ -512,6 +514,9 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
   )
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [profileNudgeDismissed, setProfileNudgeDismissed] = useState(true) // true par défaut → pas de flash
+  const [identityDismissed, setIdentityDismissed] = useState(false)
+  const [identityLinking, setIdentityLinking] = useState(false)
+  const [identityLinked, setIdentityLinked] = useState(false)
 
   // Lire le flag localStorage pour masquer le nudge profil
   useEffect(() => {
@@ -881,6 +886,77 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
         {/* Stories */}
         {(stories.length > 0 || isAdmin) && (
           <StoriesRow stories={stories} isAdmin={isAdmin} currentUserId={currentUserId} />
+        )}
+
+        {/* ── Bannière caisse ── */}
+        {caisseMontant !== null && (
+          <div className="bg-white border border-gray-100 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-sm">
+            <span className="text-xl">💰</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-900">
+                Caisse UEEMT : <span className="text-green-600">{caisseMontant.toLocaleString('fr-FR')} ₺</span>
+                {cotisationMensuelle !== null && (
+                  <span className="text-gray-400 font-normal"> · Cotisation : {cotisationMensuelle} ₺/mois</span>
+                )}
+              </p>
+            </div>
+            <Link href="/cotisations" className="text-xs text-green-600 hover:underline font-semibold flex-shrink-0">
+              Détails →
+            </Link>
+          </div>
+        )}
+
+        {/* ── Bannière auto-détection identité ── */}
+        {suggestedMember && !identityDismissed && !identityLinked && (
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl flex-shrink-0">🔍</span>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-blue-900 text-sm">
+                  Est-ce toi ? <span className="text-blue-700">{suggestedMember.prenom} {suggestedMember.nom}</span>
+                </p>
+                <p className="text-blue-600 text-xs mt-0.5">
+                  Ton email correspond à ce membre. Lie ton compte pour apparaître dans la communauté.
+                </p>
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={async () => {
+                      setIdentityLinking(true)
+                      const { error } = await lierMembreAction(suggestedMember.id)
+                      setIdentityLinking(false)
+                      if (error) {
+                        toast.error('Erreur', error)
+                      } else {
+                        setIdentityLinked(true)
+                        toast.success('Profil lié !', `Bienvenue, ${suggestedMember.prenom} !`)
+                      }
+                    }}
+                    disabled={identityLinking}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-full text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {identityLinking && <Loader2 size={12} className="animate-spin" />}
+                    Oui, c&apos;est moi ✓
+                  </button>
+                  <button
+                    onClick={() => setIdentityDismissed(true)}
+                    className="text-xs text-blue-400 hover:text-blue-600 transition-colors px-2"
+                  >
+                    Non, pas moi
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Confirmation liaison réussie */}
+        {identityLinked && (
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-3 flex items-center gap-3">
+            <span className="text-xl">✅</span>
+            <p className="text-sm text-green-800 font-semibold">
+              Profil lié avec succès — tu apparais maintenant dans la communauté !
+            </p>
+          </div>
         )}
 
         {/* Nudge profil incomplet — masqué si déjà complété une fois */}

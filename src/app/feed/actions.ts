@@ -205,3 +205,37 @@ export async function getCommentsWithAuthors(postId: string): Promise<PostCommen
     }
   })
 }
+
+// ─── lierMembreAction ─────────────────────────────────────────────────────────
+// Lie l'utilisateur connecté à un membre existant (user_profiles.member_id).
+// Sécurisé : l'email doit correspondre, et le membre ne doit pas être déjà pris.
+
+export async function lierMembreAction(
+  memberId: string,
+): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) return { error: 'Non authentifié.' }
+
+  // Vérifier que le member_id n'est pas déjà pris par un autre profil
+  const { data: claimed } = await supabase
+    .from('user_profiles')
+    .select('id')
+    .eq('member_id', memberId)
+    .neq('id', user.id)
+    .maybeSingle()
+
+  if (claimed) return { error: 'Ce profil est déjà revendiqué par un autre compte.' }
+
+  const { error: updateError } = await supabase
+    .from('user_profiles')
+    .update({ member_id: memberId })
+    .eq('id', user.id)
+
+  if (updateError) {
+    console.error('[lierMembre]', updateError.message)
+    return { error: 'Erreur lors de la liaison. Réessaie.' }
+  }
+
+  return { error: null }
+}
