@@ -4,14 +4,14 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Lock, Eye, EyeOff, Search, CheckCircle, Loader2, Mail, ShieldCheck } from 'lucide-react'
-import { verifierEmailEtEnvoyerOTP, verifierOTP, definirMotDePasseApresOTP } from './actions'
+import { creerCompteAvecEmailEtMotDePasse } from './actions'
 import { broadcastSocialEvent } from '@/lib/broadcast'
 import { createClient } from '@/lib/supabase/client'
 
 type Membre = { id: string; prenom: string; nom: string; nom_complet: string; filiere: string | null }
-type Step = 'liste' | 'email' | 'otp' | 'password' | 'succes'
+type Step = 'liste' | 'email' | 'password' | 'succes'
 
-const STEPS: Step[] = ['liste', 'email', 'otp', 'password']
+const STEPS: Step[] = ['liste', 'email', 'password']
 
 export default function PremiereConnexionClient() {
   const router = useRouter()
@@ -24,19 +24,16 @@ export default function PremiereConnexionClient() {
   const [query, setQuery] = useState('')
   const [selectedMembre, setSelectedMembre] = useState<Membre | null>(null)
   const [emailSaisi, setEmailSaisi] = useState('')
-  const [verifiedEmail, setVerifiedEmail] = useState('') // email confirmé après envoi OTP
-  const [otp, setOtp] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [resendMsg, setResendMsg] = useState('')
   const [error, setError] = useState('')
 
   const searchRef = useRef<HTMLInputElement>(null)
   const emailRef = useRef<HTMLInputElement>(null)
-  const otpRef = useRef<HTMLInputElement>(null)
+  const passwordRef = useRef<HTMLInputElement>(null)
 
   const fetchMembres = async () => {
     setLoadingMembres(true)
@@ -75,12 +72,12 @@ export default function PremiereConnexionClient() {
   useEffect(() => {
     if (step === 'liste' && !loadingMembres) searchRef.current?.focus()
     if (step === 'email') setTimeout(() => emailRef.current?.focus(), 50)
-    if (step === 'otp') setTimeout(() => otpRef.current?.focus(), 50)
+    if (step === 'password') setTimeout(() => passwordRef.current?.focus(), 50)
   }, [step, loadingMembres])
 
   useEffect(() => {
     if (step === 'succes') {
-      const t = setTimeout(() => router.push('/feed'), 1800)
+      const t = setTimeout(() => router.push('/feed'), 2000)
       return () => clearTimeout(t)
     }
   }, [step, router])
@@ -108,48 +105,23 @@ export default function PremiereConnexionClient() {
     setStep('email')
   }
 
-  const handleSendOTP = async (e: React.FormEvent) => {
+  const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedMembre || !emailValid) return
-    setLoading(true)
+    if (!emailValid) return
     setError('')
-    const { error: err } = await verifierEmailEtEnvoyerOTP(selectedMembre.id, emailSaisi.trim())
-    setLoading(false)
-    if (err) { setError(err); return }
-    // Anti-énumération : on passe toujours à l'étape OTP (même si l'email ne correspond pas)
-    setVerifiedEmail(emailSaisi.trim().toLowerCase())
-    setOtp('')
-    setStep('otp')
-  }
-
-  const handleVerifyOTP = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!verifiedEmail || otp.length !== 6) return
-    setLoading(true)
-    setError('')
-    const { error: err } = await verifierOTP(verifiedEmail, otp)
-    setLoading(false)
-    if (err) { setError(err); return }
     setStep('password')
   }
 
-  const handleResendOTP = async () => {
-    if (!selectedMembre || !verifiedEmail || loading) return
-    setLoading(true)
-    setError('')
-    setResendMsg('')
-    await verifierEmailEtEnvoyerOTP(selectedMembre.id, verifiedEmail)
-    setLoading(false)
-    setResendMsg('Code renvoyé !')
-    setTimeout(() => setResendMsg(''), 3000)
-  }
-
-  const handleSetPassword = async (e: React.FormEvent) => {
+  const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedMembre || !allCriteriaMet) return
     setLoading(true)
     setError('')
-    const { error: err } = await definirMotDePasseApresOTP(selectedMembre.id, password)
+    const { error: err } = await creerCompteAvecEmailEtMotDePasse(
+      selectedMembre.id,
+      emailSaisi.trim(),
+      password,
+    )
     setLoading(false)
     if (err) { setError(err); return }
 
@@ -175,10 +147,8 @@ export default function PremiereConnexionClient() {
 
   const handleBack = () => {
     setError('')
-    setResendMsg('')
     if (step === 'email') { setStep('liste'); return }
-    if (step === 'otp') { setStep('email'); return }
-    if (step === 'password') { setStep('otp'); return }
+    if (step === 'password') { setStep('email'); return }
     router.push('/connexion')
   }
 
@@ -210,7 +180,7 @@ export default function PremiereConnexionClient() {
           <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             {step === 'succes' ? (
               <CheckCircle size={26} className="text-green-600" />
-            ) : step === 'otp' ? (
+            ) : step === 'password' ? (
               <ShieldCheck size={26} className="text-green-600" />
             ) : step === 'email' ? (
               <Mail size={26} className="text-green-600" />
@@ -221,20 +191,18 @@ export default function PremiereConnexionClient() {
           <h1 className="text-2xl font-bold text-gray-900">
             {step === 'liste' && 'Créer mon compte'}
             {step === 'email' && 'Vérifie ton identité'}
-            {step === 'otp' && 'Code de vérification'}
             {step === 'password' && 'Choisis un mot de passe'}
             {step === 'succes' && 'Compte créé !'}
           </h1>
           <p className="text-gray-500 text-sm mt-1.5">
             {step === 'liste' && 'Tu es déjà recensé(e) ? Choisis ton nom pour commencer.'}
             {step === 'email' && 'Entre l\'email utilisé lors du recensement.'}
-            {step === 'otp' && `Code envoyé à ${verifiedEmail}`}
-            {step === 'password' && 'Identité vérifiée — crée un mot de passe sécurisé.'}
+            {step === 'password' && `Email confirmé — crée ton mot de passe sécurisé.`}
             {step === 'succes' && 'Tu vas être redirigé(e) vers le fil...'}
           </p>
         </div>
 
-        {/* Indicateur d'étapes (4 étapes) */}
+        {/* Indicateur d'étapes (3 étapes) */}
         {step !== 'succes' && (
           <div className="flex items-center gap-1 mb-6">
             {STEPS.map((s, i) => (
@@ -365,9 +333,9 @@ export default function PremiereConnexionClient() {
           </div>
         )}
 
-        {/* ── Étape 2 — Email (NOUVEAU) ── */}
+        {/* ── Étape 2 — Email ── */}
         {step === 'email' && selectedMembre && (
-          <form onSubmit={handleSendOTP} className="space-y-4">
+          <form onSubmit={handleEmailSubmit} className="space-y-4">
             <div className="bg-green-50 border border-green-100 rounded-xl p-3">
               <p className="text-xs text-gray-400 mb-0.5">Membre sélectionné</p>
               <p className="font-bold text-gray-900 text-sm">{selectedMembre.nom_complet}</p>
@@ -381,7 +349,8 @@ export default function PremiereConnexionClient() {
                 Ton adresse email
               </label>
               <p className="text-xs text-gray-400 mb-2">
-                Elle doit correspondre à celle enregistrée lors du recensement.
+                Elle doit correspondre exactement à celle renseignée lors du recensement.
+                Le système le vérifiera côté serveur.
               </p>
               <div className="relative">
                 <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -401,77 +370,21 @@ export default function PremiereConnexionClient() {
 
             <button
               type="submit"
-              disabled={loading || !emailValid}
-              className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-colors min-h-[48px] flex items-center justify-center gap-2"
+              disabled={!emailValid}
+              className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-colors min-h-[48px]"
             >
-              {loading && <Loader2 size={16} className="animate-spin" />}
-              {loading ? 'Envoi du code...' : 'Envoyer le code de vérification →'}
+              Continuer →
             </button>
           </form>
         )}
 
-        {/* ── Étape 3 — OTP (NOUVEAU) ── */}
-        {step === 'otp' && (
-          <form onSubmit={handleVerifyOTP} className="space-y-4">
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-center">
-              <p className="text-sm text-gray-600">Code à 6 chiffres envoyé à</p>
-              <p className="font-bold text-gray-900 text-sm mt-0.5">{verifiedEmail}</p>
-              <p className="text-xs text-gray-400 mt-1">Expire dans 10 minutes. Vérifie aussi les spams.</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2 text-center">
-                Code de vérification
-              </label>
-              <input
-                ref={otpRef}
-                type="text"
-                value={otp}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '').slice(0, 6)
-                  setOtp(val)
-                }}
-                className="w-full border border-gray-200 rounded-xl px-4 py-4 focus:outline-none focus:ring-2 focus:ring-green-500 text-2xl font-bold tracking-widest text-center"
-                placeholder="000000"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={6}
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading || otp.length !== 6}
-              className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-colors min-h-[48px] flex items-center justify-center gap-2"
-            >
-              {loading && <Loader2 size={16} className="animate-spin" />}
-              {loading ? 'Vérification...' : 'Vérifier le code →'}
-            </button>
-
-            <div className="text-center">
-              {resendMsg ? (
-                <p className="text-sm text-green-600 font-semibold">{resendMsg}</p>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => void handleResendOTP()}
-                  disabled={loading}
-                  className="text-sm text-gray-400 hover:text-green-600 transition-colors disabled:opacity-50"
-                >
-                  Renvoyer le code
-                </button>
-              )}
-            </div>
-          </form>
-        )}
-
-        {/* ── Étape 4 — Mot de passe (protégée par OTP) ── */}
+        {/* ── Étape 3 — Mot de passe ── */}
         {step === 'password' && selectedMembre && (
-          <form onSubmit={handleSetPassword} className="space-y-4">
+          <form onSubmit={handleCreateAccount} className="space-y-4">
             <div className="bg-green-50 border border-green-100 rounded-xl p-3">
-              <p className="text-xs text-gray-400 mb-0.5">Identité vérifiée ✓</p>
+              <p className="text-xs text-gray-400 mb-0.5">Compte à créer</p>
               <p className="font-bold text-gray-900 text-sm">{selectedMembre.nom_complet}</p>
-              <p className="text-green-600 text-xs mt-0.5">{verifiedEmail}</p>
+              <p className="text-green-600 text-xs mt-0.5 truncate">{emailSaisi.trim()}</p>
             </div>
 
             {/* Mot de passe */}
@@ -482,13 +395,13 @@ export default function PremiereConnexionClient() {
               <div className="relative">
                 <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
+                  ref={passwordRef}
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full border border-gray-200 rounded-xl pl-9 pr-10 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
                   placeholder="••••••••"
                   autoComplete="new-password"
-                  autoFocus
                 />
                 <button
                   type="button"
@@ -559,12 +472,12 @@ export default function PremiereConnexionClient() {
           </form>
         )}
 
-        {/* ── Étape 5 — Succès ── */}
+        {/* ── Étape 4 — Succès ── */}
         {step === 'succes' && (
           <div className="text-center space-y-4 py-4">
             <div className="text-5xl">🎉</div>
             <p className="text-gray-900 font-black text-lg">
-              Bienvenue, {selectedMembre?.nom_complet?.split(' ')[0]} !
+              Bienvenue, {selectedMembre?.prenom} !
             </p>
             <p className="text-green-600 font-semibold text-sm">
               Ton compte est activé. Tu fais partie de la famille UEEMT-Tokat !

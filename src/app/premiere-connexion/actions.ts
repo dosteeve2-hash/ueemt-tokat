@@ -7,30 +7,14 @@ const stripBom = (s: string | undefined) => (s ?? '').replace(/^﻿/, '').trim()
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
 
-// 3 OTP requests per memberId per 10 minutes (anti-spam)
-const otpRateLimitMap = new Map<string, { count: number; resetAt: number }>()
+// 5 tentatives / 15min par email (anti-bruteforce)
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
 
-function checkOtpRateLimit(memberId: string): boolean {
+function checkRateLimit(key: string): boolean {
   const now = Date.now()
-  const entry = otpRateLimitMap.get(memberId)
+  const entry = rateLimitMap.get(key)
   if (!entry || now > entry.resetAt) {
-    otpRateLimitMap.set(memberId, { count: 1, resetAt: now + 600_000 })
-    return true
-  }
-  if (entry.count >= 3) return false
-  entry.count++
-  return true
-}
-
-// 5 password attempts per email per 15 minutes
-const passwordRateLimitMap = new Map<string, { count: number; resetAt: number }>()
-
-function checkPasswordRateLimit(email: string): boolean {
-  const key = email.toLowerCase()
-  const now = Date.now()
-  const entry = passwordRateLimitMap.get(key)
-  if (!entry || now > entry.resetAt) {
-    passwordRateLimitMap.set(key, { count: 1, resetAt: now + 900_000 })
+    rateLimitMap.set(key, { count: 1, resetAt: now + 900_000 })
     return true
   }
   if (entry.count >= 5) return false
@@ -38,13 +22,15 @@ function checkPasswordRateLimit(email: string): boolean {
   return true
 }
 
-// ─── verifierEmailEtEnvoyerOTP ────────────────────────────────────────────────
-// Vérifie côté serveur que l'email saisi correspond au membre, puis envoie un OTP.
-// Anti-énumération : retourne toujours le même message de succès générique.
+// ─── creerCompteAvecEmailEtMotDePasse ─────────────────────────────────────────
+// Vérifie l'email côté serveur contre la DB, crée ou met à jour le compte
+// Supabase Auth, et connecte l'utilisateur sans aucun email OTP.
+// Sécurisé car l'email doit correspondre exactement à celui en DB.
 
-export async function verifierEmailEtEnvoyerOTP(
+export async function creerCompteAvecEmailEtMotDePasse(
   memberId: string,
   emailSaisi: string,
+  password: string,
 ): Promise<{ error: string | null }> {
   if (!memberId) return { error: 'Membre non sélectionné.' }
 
@@ -53,8 +39,18 @@ export async function verifierEmailEtEnvoyerOTP(
     return { error: 'Adresse email invalide.' }
   }
 
-  if (!checkOtpRateLimit(memberId)) {
-    return { error: 'Trop de tentatives. Réessaie dans 10 minutes.' }
+  if (!password || password.length < 8) {
+    return { error: 'Mot de passe trop court (minimum 8 caractères).' }
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { error: 'Le mot de passe doit contenir au moins une majuscule.' }
+  }
+  if (!/[0-9]/.test(password)) {
+    return { error: 'Le mot de passe doit contenir au moins un chiffre.' }
+  }
+
+  if (!checkRateLimit(emailInput)) {
+    return { error: 'Trop de tentatives. Réessaie dans 15 minutes.' }
   }
 
   const serviceKey = stripBom(process.env.SUPABASE_SERVICE_ROLE_KEY)
@@ -68,106 +64,92 @@ export async function verifierEmailEtEnvoyerOTP(
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  // Récupérer l'email DB — opération 100% serveur, jamais exposée au client
+  // ─── 1. Vérifier l'email côté serveur (jamais exposé au client) ───────────
   const { data: membre } = await admin
     .from('members')
-    .select('email')
+    .select('email, prenom, nom')
     .eq('id', memberId)
     .single()
 
   const emailDB = (membre?.email as string | null)?.toLowerCase().trim() ?? null
 
-  // Anti-énumération : même chemin de retour si email incorrect ou membre introuvable
   if (!emailDB || emailDB !== emailInput) {
-    // On ne révèle pas si l'email correspond ou non
-    return { error: null }
+    return { error: 'Cet email ne correspond pas à celui enregistré lors du recensement. Vérifie ton email ou contacte le bureau.' }
   }
 
-  // Email vérifié — envoyer l'OTP (shouldCreateUser: true pour les nouveaux membres)
-  const supabase = await createSupabaseServerClient()
-  await supabase.auth.signInWithOtp({
-    email: emailDB,
-    options: { shouldCreateUser: true },
+  const email = membre!.email as string
+
+  // ─── 2. Créer ou mettre à jour le compte Supabase Auth ───────────────────
+  let userId: string
+
+  const { data: newUserData, error: createError } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
   })
 
-  return { error: null }
-}
+  if (createError) {
+    // L'utilisateur existe déjà → mettre à jour son mot de passe
+    const { data: listData } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
+    const existingUser = listData?.users?.find(
+      (u) => u.email?.toLowerCase() === email.toLowerCase(),
+    )
 
-// ─── verifierOTP ──────────────────────────────────────────────────────────────
-// Vérifie le code OTP reçu par email. Si correct, crée la session auth dans les cookies.
+    if (!existingUser) {
+      console.error('[creerCompte] createUser error:', createError.message)
+      return { error: 'Erreur lors de la création du compte. Réessaie.' }
+    }
 
-export async function verifierOTP(
-  email: string,
-  token: string,
-): Promise<{ error: string | null }> {
-  const normalizedEmail = email.trim().toLowerCase()
-  if (!normalizedEmail || !token || token.trim().length !== 6) {
-    return { error: 'Code invalide.' }
-  }
-
-  const supabase = await createSupabaseServerClient()
-  const { error } = await supabase.auth.verifyOtp({
-    email: normalizedEmail,
-    token: token.trim(),
-    type: 'email',
-  })
-
-  if (error) {
-    console.error('[verifierOTP]', error.message)
-    return { error: 'Code incorrect ou expiré. Vérifie ta boîte mail ou demande un nouveau code.' }
-  }
-
-  return { error: null }
-}
-
-// ─── definirMotDePasseApresOTP ────────────────────────────────────────────────
-// Définit le mot de passe d'un utilisateur déjà authentifié via OTP.
-// Appelé uniquement après vérification OTP réussie — la session est dans les cookies.
-
-export async function definirMotDePasseApresOTP(
-  memberId: string,
-  password: string,
-): Promise<{ error: string | null }> {
-  if (!password || password.length < 8) {
-    return { error: 'Le mot de passe doit contenir au moins 8 caractères.' }
-  }
-  if (!/[A-Z]/.test(password)) {
-    return { error: 'Le mot de passe doit contenir au moins une majuscule.' }
-  }
-  if (!/[0-9]/.test(password)) {
-    return { error: 'Le mot de passe doit contenir au moins un chiffre.' }
-  }
-
-  const supabase = await createSupabaseServerClient()
-
-  // L'utilisateur doit être authentifié (session issue du OTP)
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
-  if (userError || !user) {
-    return { error: 'Session expirée. Recommence depuis le début.' }
-  }
-
-  if (!checkPasswordRateLimit(user.email ?? '')) {
-    return { error: 'Trop de tentatives. Réessaie dans 15 minutes.' }
-  }
-
-  // Définir le mot de passe sur le compte déjà authentifié
-  const { error: updateError } = await supabase.auth.updateUser({ password })
-  if (updateError) {
-    console.error('[definirMotDePasseApresOTP] updateUser:', updateError.message)
-    return { error: 'Erreur lors de la définition du mot de passe. Réessaie.' }
-  }
-
-  // Activer le membre et confirmer l'email dans la table members
-  const serviceKey = stripBom(process.env.SUPABASE_SERVICE_ROLE_KEY)
-  const supabaseUrl = stripBom(process.env.NEXT_PUBLIC_SUPABASE_URL)
-  if (serviceKey.startsWith('eyJ')) {
-    const admin = createAdminClient(supabaseUrl, serviceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
+    const { error: updateError } = await admin.auth.admin.updateUserById(existingUser.id, {
+      password,
+      email_confirm: true,
     })
-    await admin
-      .from('members')
-      .update({ email: user.email, is_active: true })
-      .eq('id', memberId)
+    if (updateError) {
+      console.error('[creerCompte] updateUser error:', updateError.message)
+      return { error: 'Erreur lors de la mise à jour du mot de passe.' }
+    }
+
+    userId = existingUser.id
+  } else {
+    userId = newUserData.user.id
+  }
+
+  // ─── 3. Lier le user_profile au membre (si pas encore fait) ──────────────
+  // Vérifie qu'aucun autre profil ne revendique déjà ce membre
+  const { data: existingProfile } = await admin
+    .from('user_profiles')
+    .select('id, member_id')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (existingProfile && !existingProfile.member_id) {
+    // Vérifie que le member_id n'est pas déjà pris
+    const { data: claimedBy } = await admin
+      .from('user_profiles')
+      .select('id')
+      .eq('member_id', memberId)
+      .maybeSingle()
+
+    if (!claimedBy) {
+      await admin
+        .from('user_profiles')
+        .update({ member_id: memberId })
+        .eq('id', userId)
+    }
+  }
+
+  // ─── 4. Activer le membre ─────────────────────────────────────────────────
+  await admin
+    .from('members')
+    .update({ is_active: true })
+    .eq('id', memberId)
+
+  // ─── 5. Connecter directement via signInWithPassword ─────────────────────
+  const supabase = await createSupabaseServerClient()
+  const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+  if (signInError) {
+    console.error('[creerCompte] signIn error:', signInError.message)
+    return { error: 'Compte créé, mais connexion automatique échouée. Connecte-toi normalement via /connexion.' }
   }
 
   return { error: null }
