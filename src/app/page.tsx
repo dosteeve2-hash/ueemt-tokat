@@ -194,19 +194,28 @@ export default async function HomePage() {
               ))}
             </div>
             <div className="flex flex-col sm:flex-row gap-3 justify-center mt-8">
-              <Link
-                href="/connexion"
-                className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-semibold inline-block transition-colors text-center"
-              >
-                Se connecter pour voir plus →
-              </Link>
-              {!isLoggedIn && (
+              {isLoggedIn ? (
                 <Link
-                  href="/premiere-connexion"
-                  className="border-2 border-green-600 text-green-600 hover:bg-green-50 px-8 py-3 rounded-full font-semibold inline-block transition-colors text-center"
+                  href="/feed"
+                  className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-semibold inline-block transition-colors text-center"
                 >
-                  Créer mon compte
+                  Voir le fil d&apos;actualité →
                 </Link>
+              ) : (
+                <>
+                  <Link
+                    href="/connexion"
+                    className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-full font-semibold inline-block transition-colors text-center"
+                  >
+                    Se connecter pour voir plus →
+                  </Link>
+                  <Link
+                    href="/premiere-connexion"
+                    className="border-2 border-green-600 text-green-600 hover:bg-green-50 px-8 py-3 rounded-full font-semibold inline-block transition-colors text-center"
+                  >
+                    Créer mon compte
+                  </Link>
+                </>
               )}
             </div>
           </div>

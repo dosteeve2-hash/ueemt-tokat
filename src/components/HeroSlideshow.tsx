@@ -112,22 +112,28 @@ export default function HeroSlideshow({ photos, title, subtitle, tagline, isLogg
         <p className="text-green-300 italic mb-8 sm:mb-10 text-base sm:text-lg">{tagline}</p>
 
         {isLoggedIn ? (
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
-            <Link
-              href="/feed"
-              className="bg-green-500 hover:bg-green-400 text-white px-8 py-4 rounded-xl font-bold text-base sm:text-lg transition-all hover:scale-105 shadow-lg inline-flex items-center justify-center min-h-[52px]"
-            >
-              📰 Accéder au fil →
-            </Link>
-            <a
-              href="https://www.instagram.com/ueemt.tokat"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 border-2 border-white/30 hover:border-white text-white px-8 py-4 rounded-xl font-semibold transition-all min-h-[52px]"
-            >
-              <InstagramIcon size={20} />
-              @ueemt.tokat
-            </a>
+          <div className="flex flex-col items-center gap-4">
+            <div className="flex items-center gap-2 bg-green-500/20 border border-green-500/40 rounded-full px-4 py-2">
+              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              <span className="text-green-300 text-sm font-medium">Connecté · Bienvenue !</span>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+              <Link
+                href="/feed"
+                className="bg-green-500 hover:bg-green-400 text-white px-8 py-4 rounded-xl font-bold text-base sm:text-lg transition-all hover:scale-105 shadow-lg inline-flex items-center justify-center min-h-[52px]"
+              >
+                📰 Accéder au fil →
+              </Link>
+              <a
+                href="https://www.instagram.com/ueemt.tokat"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 border-2 border-white/30 hover:border-white text-white px-8 py-4 rounded-xl font-semibold transition-all min-h-[52px]"
+              >
+                <InstagramIcon size={20} />
+                @ueemt.tokat
+              </a>
+            </div>
           </div>
         ) : (
           <>
