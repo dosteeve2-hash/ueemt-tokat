@@ -50,7 +50,7 @@ export default async function FeedPage() {
   const authorIds = [...new Set((postsData ?? []).map(p => p.author_id))]
 
   // Layer 2: all depend on layer 1, but independent of each other — run in parallel
-  const [myMemberResp, likesResp, commentsResp, authorProfilesResp] = await Promise.all([
+  const [myMemberResp, likesResp, commentsResp, authorProfilesResp, suggestedMemberResp] = await Promise.all([
     myProfile?.member_id
       ? supabase.from('members').select('prenom, nom').eq('id', myProfile.member_id).single()
       : Promise.resolve({ data: null as { prenom: string; nom: string } | null }),
@@ -68,9 +68,31 @@ export default async function FeedPage() {
     authorIds.length > 0
       ? supabase.from('user_profiles').select('id, avatar_url, member_id').in('id', authorIds)
       : Promise.resolve({ data: [] as { id: string; avatar_url: string | null; member_id: string | null }[] }),
+    // Auto-detect identity: si pas de member_id, chercher par email
+    (!myProfile?.member_id && user.email)
+      ? (async () => {
+          try {
+            const { data: membre } = await supabase
+              .from('members')
+              .select('id, prenom, nom')
+              .eq('email', user.email)
+              .maybeSingle()
+            if (!membre) return null
+            // S'assurer que ce membre n'est pas déjà revendiqué par un autre profil
+            const { data: claimed } = await supabase
+              .from('user_profiles')
+              .select('id')
+              .eq('member_id', membre.id)
+              .neq('id', user.id)
+              .maybeSingle()
+            return claimed ? null : (membre as { id: string; prenom: string; nom: string })
+          } catch { return null }
+        })()
+      : Promise.resolve(null),
   ])
 
   const myMemberName = myMemberResp.data ?? { prenom: '', nom: '' }
+  const suggestedMember = suggestedMemberResp ?? null
 
   const likesByPost: Record<string, number> = {}
   const userLikedSet = new Set<string>()
@@ -126,6 +148,7 @@ export default async function FeedPage() {
   const hasBio = !!((myProfile as { bio?: string | null } | null)?.bio?.trim())
   const hasAvatar = !!(myProfile?.avatar_url)
   const caisseMontant = (caisseData as { montant?: number } | null)?.montant ?? null
+  const cotisationMensuelle = (caisseData as { cotisation_mensuelle?: number } | null)?.cotisation_mensuelle ?? null
 
   return (
     <FeedClient
@@ -135,6 +158,8 @@ export default async function FeedPage() {
       currentUserName={myMemberName}
       stories={stories}
       isAdmin={isAdmin}
+      suggestedMember={suggestedMember}
+      cotisationMensuelle={cotisationMensuelle}
       hasBio={hasBio}
       hasAvatar={hasAvatar}
       caisseMontant={caisseMontant}
