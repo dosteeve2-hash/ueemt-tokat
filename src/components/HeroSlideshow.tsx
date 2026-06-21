@@ -9,9 +9,10 @@ interface Props {
   title: string
   subtitle: string
   tagline: string
+  isLoggedIn?: boolean
 }
 
-export default function HeroSlideshow({ photos, title, subtitle, tagline }: Props) {
+export default function HeroSlideshow({ photos, title, subtitle, tagline, isLoggedIn = false }: Props) {
   const [current, setCurrent] = useState(0)
   const touchStartX = useRef<number | null>(null)
   const hasPhotos = photos.length > 0
@@ -110,31 +111,53 @@ export default function HeroSlideshow({ photos, title, subtitle, tagline }: Prop
         <p className="text-lg sm:text-xl md:text-2xl text-gray-200 mb-2 font-light px-2">{subtitle}</p>
         <p className="text-green-300 italic mb-8 sm:mb-10 text-base sm:text-lg">{tagline}</p>
 
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
-          <Link
-            href="/connexion"
-            className="bg-green-500 hover:bg-green-400 text-white px-8 py-4 rounded-xl font-bold text-base sm:text-lg transition-all hover:scale-105 shadow-lg inline-flex items-center justify-center min-h-[52px]"
-          >
-            Se connecter →
-          </Link>
-          <a
-            href="https://www.instagram.com/ueemt.tokat"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 border-2 border-white/30 hover:border-white text-white px-8 py-4 rounded-xl font-semibold transition-all min-h-[52px]"
-          >
-            <InstagramIcon size={20} />
-            @ueemt.tokat
-          </a>
-        </div>
-        <div className="mt-4">
-          <Link
-            href="/recensement"
-            className="text-green-300 hover:text-white text-sm underline underline-offset-2 transition-colors"
-          >
-            Nouveau membre ? Se recenser →
-          </Link>
-        </div>
+        {isLoggedIn ? (
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+            <Link
+              href="/feed"
+              className="bg-green-500 hover:bg-green-400 text-white px-8 py-4 rounded-xl font-bold text-base sm:text-lg transition-all hover:scale-105 shadow-lg inline-flex items-center justify-center min-h-[52px]"
+            >
+              📰 Accéder au fil →
+            </Link>
+            <a
+              href="https://www.instagram.com/ueemt.tokat"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 border-2 border-white/30 hover:border-white text-white px-8 py-4 rounded-xl font-semibold transition-all min-h-[52px]"
+            >
+              <InstagramIcon size={20} />
+              @ueemt.tokat
+            </a>
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+              <Link
+                href="/connexion"
+                className="bg-green-500 hover:bg-green-400 text-white px-8 py-4 rounded-xl font-bold text-base sm:text-lg transition-all hover:scale-105 shadow-lg inline-flex items-center justify-center min-h-[52px]"
+              >
+                Se connecter →
+              </Link>
+              <a
+                href="https://www.instagram.com/ueemt.tokat"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 border-2 border-white/30 hover:border-white text-white px-8 py-4 rounded-xl font-semibold transition-all min-h-[52px]"
+              >
+                <InstagramIcon size={20} />
+                @ueemt.tokat
+              </a>
+            </div>
+            <div className="mt-4">
+              <Link
+                href="/recensement"
+                className="text-green-300 hover:text-white text-sm underline underline-offset-2 transition-colors"
+              >
+                Nouveau membre ? Se recenser →
+              </Link>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Prev / Next arrows */}
