@@ -2,6 +2,7 @@
 
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient as createSupabaseServerClient } from '@/lib/supabase/server'
+import { getAppRole } from '@/lib/constants'
 
 const stripBom = (s: string | undefined) => (s ?? '').replace(/^﻿/, '').trim()
 
@@ -67,7 +68,7 @@ export async function creerCompteAvecEmailEtMotDePasse(
   // ─── 1. Vérifier l'email côté serveur (jamais exposé au client) ───────────
   const { data: membre } = await admin
     .from('members')
-    .select('email, prenom, nom')
+    .select('id, email, prenom, nom')
     .eq('id', memberId)
     .single()
 
@@ -114,27 +115,33 @@ export async function creerCompteAvecEmailEtMotDePasse(
     userId = newUserData.user.id
   }
 
-  // ─── 3. Lier le user_profile au membre (si pas encore fait) ──────────────
-  // Vérifie qu'aucun autre profil ne revendique déjà ce membre
-  const { data: existingProfile } = await admin
+  // ─── 3. Upsert user_profile (crée si absent, met à jour si existant) ────────
+  // Détermine le rôle en fonction des constantes du bureau
+  const role = getAppRole(
+    (membre!.prenom as string) ?? '',
+    (membre!.nom as string) ?? '',
+  )
+
+  // Vérifier que le member_id n'est pas déjà pris par UN AUTRE compte
+  const { data: claimedBy } = await admin
     .from('user_profiles')
-    .select('id, member_id')
-    .eq('id', userId)
+    .select('id')
+    .eq('member_id', memberId)
+    .neq('id', userId)
     .maybeSingle()
 
-  if (existingProfile && !existingProfile.member_id) {
-    // Vérifie que le member_id n'est pas déjà pris
-    const { data: claimedBy } = await admin
+  if (!claimedBy) {
+    // Upsert : INSERT pour les nouveaux, UPDATE pour les existants
+    // Utilise le client admin pour bypasser RLS (fiable même si session pas encore propagée)
+    const { error: upsertError } = await admin
       .from('user_profiles')
-      .select('id')
-      .eq('member_id', memberId)
-      .maybeSingle()
-
-    if (!claimedBy) {
-      await admin
-        .from('user_profiles')
-        .update({ member_id: memberId })
-        .eq('id', userId)
+      .upsert(
+        { id: userId, member_id: memberId, role },
+        { onConflict: 'id', ignoreDuplicates: false },
+      )
+    if (upsertError) {
+      console.error('[creerCompte] upsert user_profiles:', upsertError.message)
+      // Non-bloquant : /api/onboarding le retentera côté client
     }
   }
 
