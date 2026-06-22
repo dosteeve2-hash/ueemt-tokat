@@ -778,7 +778,12 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
           }
         }
 
-        await createPost(content, imageUrl, documentUrl, documentName, uploadedImageUrls, postLinkUrl)
+        const result = await createPost(content, imageUrl, documentUrl, documentName, uploadedImageUrls, postLinkUrl)
+        if (result.error) {
+          setPosts(prev => prev.filter(p => p.id !== optimisticPost.id))
+          toast.error('Publication échouée', result.error)
+          return
+        }
         setIsRefreshing(true)
         router.refresh()
         toast.success('Post publié !', 'Ton post est visible par tous les membres.')

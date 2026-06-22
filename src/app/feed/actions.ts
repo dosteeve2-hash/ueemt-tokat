@@ -22,13 +22,13 @@ export async function createPost(
   documentName?: string,
   imageUrls?: string[],
   linkUrl?: string,
-) {
+): Promise<{ error: string | null }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/connexion')
   const trimmedContent = content.trim()
   const hasMedia = imageUrl || documentUrl || (imageUrls && imageUrls.length > 0) || linkUrl
-  if (!trimmedContent && !hasMedia) throw new Error('Post vide')
+  if (!trimmedContent && !hasMedia) return { error: 'Post vide' }
 
   const { data: newPost, error } = await supabase.from('posts').insert({
     content: trimmedContent.slice(0, 2000),
@@ -41,7 +41,7 @@ export async function createPost(
   }).select('id, type, is_pinned').single()
   if (error) {
     console.error('[createPost]', error.code)
-    throw new Error('Impossible de publier le post. Réessaie.')
+    return { error: 'Impossible de publier le post. Réessaie.' }
   }
 
   // Notify admins if it's a pinned/announcement post
@@ -63,6 +63,7 @@ export async function createPost(
       url: '/feed',
     }),
   }).catch(() => {})
+  return { error: null }
 }
 
 export async function deletePost(postId: string) {
