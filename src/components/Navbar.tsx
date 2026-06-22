@@ -144,11 +144,11 @@ export default function Navbar() {
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : pathname?.startsWith(href)
 
-  // Bottom nav links (mobile only, logged in)
+  // Bottom nav links (mobile only)
   const bottomNavLinks = user ? [
     { href: '/feed', label: 'Fil', icon: Rss },
     { href: '/membres', label: 'Membres', icon: Users },
-    { href: '/evenements', label: 'Événements', icon: CalendarDays },
+    { href: dashboardHref, label: 'Mon espace', icon: LayoutDashboard },
     { href: '/profil', label: 'Profil', icon: User },
   ] : [
     { href: '/', label: 'Accueil', icon: Home },
