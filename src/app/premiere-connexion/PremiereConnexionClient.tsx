@@ -190,13 +190,13 @@ export default function PremiereConnexionClient() {
           </div>
           <h1 className="text-2xl font-bold text-gray-900">
             {step === 'liste' && 'Créer mon compte'}
-            {step === 'email' && 'Vérifie ton identité'}
+            {step === 'email' && 'Entre ton email'}
             {step === 'password' && 'Choisis un mot de passe'}
             {step === 'succes' && 'Compte créé !'}
           </h1>
           <p className="text-gray-500 text-sm mt-1.5">
             {step === 'liste' && 'Tu es déjà recensé(e) ? Choisis ton nom pour commencer.'}
-            {step === 'email' && 'Entre l\'email utilisé lors du recensement.'}
+            {step === 'email' && 'C\'est l\'adresse que tu utiliseras pour te connecter.'}
             {step === 'password' && `Email confirmé — crée ton mot de passe sécurisé.`}
             {step === 'succes' && 'Tu vas être redirigé(e) vers le fil...'}
           </p>
@@ -349,8 +349,7 @@ export default function PremiereConnexionClient() {
                 Ton adresse email
               </label>
               <p className="text-xs text-gray-400 mb-2">
-                Elle doit correspondre exactement à celle renseignée lors du recensement.
-                Le système le vérifiera côté serveur.
+                Saisis l&apos;adresse que tu veux utiliser pour te connecter à UEEMT-Tokat.
               </p>
               <div className="relative">
                 <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />

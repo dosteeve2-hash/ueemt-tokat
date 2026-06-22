@@ -65,20 +65,31 @@ export async function creerCompteAvecEmailEtMotDePasse(
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  // ─── 1. Vérifier l'email côté serveur (jamais exposé au client) ───────────
+  // ─── 1. Vérifier / enregistrer l'email ──────────────────────────────────────
   const { data: membre } = await admin
     .from('members')
     .select('id, email, prenom, nom')
     .eq('id', memberId)
     .single()
 
-  const emailDB = (membre?.email as string | null)?.toLowerCase().trim() ?? null
+  if (!membre) {
+    return { error: 'Membre introuvable. Vérifie ta sélection.' }
+  }
 
-  if (!emailDB || emailDB !== emailInput) {
+  const emailDB = (membre.email as string | null)?.toLowerCase().trim() ?? null
+
+  if (emailDB && emailDB !== emailInput) {
+    // Un email était déjà enregistré ET il ne correspond pas → erreur
     return { error: 'Cet email ne correspond pas à celui enregistré lors du recensement. Vérifie ton email ou contacte le bureau.' }
   }
 
-  const email = membre!.email as string
+  // Si aucun email n'était enregistré (recensement sans email), on sauvegarde
+  // celui que le membre vient de saisir pour les connexions futures.
+  if (!emailDB) {
+    await admin.from('members').update({ email: emailInput }).eq('id', memberId)
+  }
+
+  const email = emailInput
 
   // ─── 2. Créer ou mettre à jour le compte Supabase Auth ───────────────────
   let userId: string
