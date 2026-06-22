@@ -1,5 +1,49 @@
 # CLAUDE.md — UEEMT-Tokat
 
+## Méthode de travail — Le Loop
+
+Chaque tâche non triviale s'exécute en boucle jusqu'à « TERMINÉ ». Ne jamais s'arrêter sur un résultat partiel.
+
+### Protocole (à répéter à chaque tour)
+
+1. **PLAN** — Annoncer la seule prochaine action.
+2. **FAIRE** — Produire ou améliorer le travail.
+3. **VÉRIFIER** — Noter le résultat de 1 à 10 sur CHAQUE critère de réussite. Être brutalement honnête. Lister précisément ce qui est encore faible.
+4. **DÉCIDER** — Si chaque critère est à 8 ou plus : écrire « TERMINÉ » et s'arrêter. Sinon : écrire « JE CONTINUE » et recommencer en corrigeant d'abord le point le plus faible.
+
+### Règles
+
+- Ne jamais déclarer « TERMINÉ » tant qu'un critère est en dessous de 8.
+- À chaque tour, corriger en priorité la note la plus basse du dernier VÉRIFIER.
+- Ne pas poser de questions sans données : prendre une hypothèse raisonnable, la signaler, et continuer.
+- **Limite de sécurité** : s'arrêter après 8 tours et faire un rapport, même si l'objectif n'est pas atteint.
+- La vérification doit être objective : test qui passe, chiffre à dépasser, règle mesurable — jamais une auto-notation complaisante.
+
+### Quand utiliser un Loop
+
+Toutes les 4 cases doivent être cochées :
+- ☑ La tâche revient (au moins une fois par semaine)
+- ☑ Quelque chose peut rejeter automatiquement un mauvais résultat (test, règle, chiffre)
+- ☑ L'IA peut faire le travail de bout en bout
+- ☑ « Terminé » est objectif, pas une question de goût
+
+Si une case manque → garder un prompt manuel simple.
+
+### Quand Steve donne un objectif
+
+Steve donne : l'objectif + les critères de réussite.
+Claude fait : PLAN → FAIRE → VÉRIFIER → DÉCIDER en boucle, sans interruption, jusqu'à TERMINÉ.
+Claude pose des questions uniquement si une information bloquante manque — sinon il prend une hypothèse raisonnable et la signale.
+
+### Automatisation (ordre obligatoire)
+
+1. Run manuel propre
+2. Transformer en skill (instructions sauvegardées dans `~/.claude/skills/`)
+3. Encadrer dans un Loop (vérification + condition d'arrêt)
+4. Seulement après : mettre sur planning (cron/schedule)
+
+---
+
 Projet : site web de l'Union des Élèves et Étudiants Maliens à Tokat (Turquie).
 
 Stack : Next.js 16 App Router · TypeScript strict · Tailwind CSS · Supabase (Auth + DB + Storage) · Vercel
