@@ -17,6 +17,16 @@ export async function POST(request: Request) {
     return Response.json({ error: 'VAPID non configuré' }, { status: 500 })
   }
 
+  // Internal endpoint — require CRON_SECRET to prevent unauthorized push spam
+  // Called from Server Actions via internal fetch with Authorization header
+  const cronSecret = process.env.CRON_SECRET
+  if (cronSecret) {
+    const authHeader = request.headers.get('authorization')
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return Response.json({ error: 'Non autorisé' }, { status: 401 })
+    }
+  }
+
   const body = await request.json() as { title?: string; message?: string; url?: string }
   const title = body.title ?? 'UEEMT-Tokat'
   const message = body.message ?? 'Nouveau message dans le fil d\'actu'

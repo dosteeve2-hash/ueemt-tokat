@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { renderToBuffer, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 import React from 'react'
+import { createClient } from '@/lib/supabase/server'
+import { sanitizeText, sanitizeFilename } from '@/lib/sanitize'
 
 const styles = StyleSheet.create({
   page: { padding: 40, backgroundColor: '#ffffff', fontFamily: 'Helvetica' },
@@ -18,7 +20,14 @@ const styles = StyleSheet.create({
 })
 
 export async function POST(req: NextRequest) {
-  const { prenom, nom, filiere, universite, niveau, num_etudiant } = await req.json() as {
+  // Auth check — only authenticated members can generate attestations
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
+  }
+
+  const raw = await req.json() as {
     prenom: string
     nom: string
     filiere?: string
@@ -26,6 +35,19 @@ export async function POST(req: NextRequest) {
     niveau?: string
     num_etudiant?: string
   }
+
+  // Sanitize all user-controlled fields before embedding in PDF
+  const prenom = sanitizeText(raw.prenom ?? '', 100)
+  const nom = sanitizeText(raw.nom ?? '', 100)
+  const filiere = raw.filiere ? sanitizeText(raw.filiere, 200) : undefined
+  const universite = raw.universite ? sanitizeText(raw.universite, 200) : undefined
+  const niveau = raw.niveau ? sanitizeText(raw.niveau, 100) : undefined
+  const num_etudiant = raw.num_etudiant ? sanitizeText(raw.num_etudiant, 50) : undefined
+
+  if (!prenom || !nom) {
+    return NextResponse.json({ error: 'Prénom et nom requis.' }, { status: 400 })
+  }
+
   const date = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
 
   const fieldRows: [string, string][] = [
@@ -86,7 +108,7 @@ export async function POST(req: NextRequest) {
   return new NextResponse(blob, {
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="attestation-ueemt-${nom?.toLowerCase() ?? 'membre'}.pdf"`,
+      'Content-Disposition': `attachment; filename="attestation-ueemt-${sanitizeFilename(nom.toLowerCase())}.pdf"`,
     },
   })
 }

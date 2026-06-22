@@ -30,8 +30,8 @@ export async function createListing(formData: FormData): Promise<{ error: string
     return { error: 'Trop d\'annonces créées. Réessaie dans 1 heure.' }
   }
 
-  const title = (formData.get('title') as string | null)?.trim() ?? ''
-  const description = (formData.get('description') as string | null)?.trim() ?? ''
+  const title = (formData.get('title') as string | null)?.trim().slice(0, 200) ?? ''
+  const description = (formData.get('description') as string | null)?.trim().slice(0, 1000) ?? ''
   const category = (formData.get('category') as string | null)?.trim() ?? ''
   const priceRaw = formData.get('price') as string | null
   const price = priceRaw ? parseFloat(priceRaw) : null

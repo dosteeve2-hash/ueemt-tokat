@@ -38,9 +38,11 @@ export async function GET(request: Request) {
         : caisseError?.message,
     }
 
-    // Check 3 : Auth Supabase accessible
-    const { error: authError } = await supabase.auth.getSession()
-    checks.auth = { ok: !authError, detail: authError?.message }
+    // Check 3 : Auth Supabase accessible (getUser() — server-side JWT verify, no client trust)
+    const { error: authError } = await supabase.auth.getUser()
+    // An anonymous request returns a "user not found" error — that's expected and means auth is UP
+    const authDown = authError && !authError.message.includes('not authenticated') && !authError.message.includes('JWT')
+    checks.auth = { ok: !authDown, detail: authDown ? authError?.message : 'Auth API opérationnelle' }
 
   } catch (e) {
     checks.general = { ok: false, detail: String(e) }

@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { insertNotification, getAdminUserIds } from '@/app/notifications/actions'
+import { sanitizeUrl, sanitizeFilename } from '@/lib/sanitize'
 
 export type PostCommentData = {
   id: string
@@ -27,17 +28,25 @@ export async function createPost(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/connexion')
   const trimmedContent = content.trim()
-  const hasMedia = imageUrl || documentUrl || (imageUrls && imageUrls.length > 0) || linkUrl
+
+  // Sanitize URL and filename inputs before persisting
+  const safeImageUrl = imageUrl ? sanitizeUrl(imageUrl) : undefined
+  const safeDocumentUrl = documentUrl ? sanitizeUrl(documentUrl) : undefined
+  const safeLinkUrl = linkUrl ? sanitizeUrl(linkUrl) : undefined
+  const safeDocumentName = documentName ? sanitizeFilename(documentName) : undefined
+  const safeImageUrls = imageUrls?.map(u => sanitizeUrl(u)).filter(Boolean) as string[] | undefined
+
+  const hasMedia = safeImageUrl || safeDocumentUrl || (safeImageUrls && safeImageUrls.length > 0) || safeLinkUrl
   if (!trimmedContent && !hasMedia) return { error: 'Post vide' }
 
   const { data: newPost, error } = await supabase.from('posts').insert({
     content: trimmedContent.slice(0, 2000),
     author_id: user.id,
     type: 'post',
-    ...(imageUrl ? { image_url: imageUrl } : {}),
-    ...(imageUrls && imageUrls.length > 0 ? { image_urls: imageUrls } : {}),
-    ...(linkUrl ? { link_url: linkUrl } : {}),
-    ...(documentUrl ? { document_url: documentUrl, document_name: documentName ?? null } : {}),
+    ...(safeImageUrl ? { image_url: safeImageUrl } : {}),
+    ...(safeImageUrls && safeImageUrls.length > 0 ? { image_urls: safeImageUrls } : {}),
+    ...(safeLinkUrl ? { link_url: safeLinkUrl } : {}),
+    ...(safeDocumentUrl ? { document_url: safeDocumentUrl, document_name: safeDocumentName ?? null } : {}),
   }).select('id, type, is_pinned').single()
   if (error) {
     console.error('[createPost]', error.code)
@@ -52,11 +61,15 @@ export async function createPost(
     }
   }
 
-  // Fire-and-forget push notification
+  // Fire-and-forget push notification (internal — pass CRON_SECRET for auth)
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://ueemt-tokat.vercel.app'
+  const cronSecret = process.env.CRON_SECRET
   fetch(`${siteUrl}/api/notify`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(cronSecret ? { 'Authorization': `Bearer ${cronSecret}` } : {}),
+    },
     body: JSON.stringify({
       title: 'UEEMT-Tokat',
       message: 'Nouveau post dans le fil d\'actu',

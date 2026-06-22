@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getAppRole } from '@/lib/constants'
 import { sendWelcomeEmail } from '@/lib/email'
+import { sanitizeText } from '@/lib/sanitize'
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,7 +13,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Non authentifié.' }, { status: 401 })
     }
 
-    const { memberId, prenom, nom } = await req.json()
+    const raw = await req.json()
+    const memberId = raw.memberId as string | undefined
+    const prenom = sanitizeText(raw.prenom ?? '', 100)
+    const nom = sanitizeText(raw.nom ?? '', 100)
 
     if (!memberId || !prenom || !nom) {
       return NextResponse.json({ error: 'Données manquantes.' }, { status: 400 })
