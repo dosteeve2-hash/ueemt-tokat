@@ -385,6 +385,54 @@ const m = useModal()
 
 ---
 
+## Sécurité — 4 règles non négociables
+
+Ces règles s'appliquent à TOUS les projets Next.js + Supabase. Ne jamais les ignorer.
+
+### 1. Clés API — jamais côté client
+
+- Seuls `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_ANON_KEY` peuvent être dans des composants client
+- `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY` et toutes les autres clés privées → uniquement dans Server Actions, API Routes ou Server Components
+- Vérifier avec `grep -r "process.env\." src/app --include="*.tsx"` que les composants `'use client'` n'accèdent à aucune clé privée
+- Tout appel à une API externe (Resend, OpenAI, etc.) doit passer par une Server Action, jamais directement depuis le navigateur
+
+### 2. Validation des champs utilisateur
+
+- Tout champ texte reçoit `.trim()` + limite de longueur avant de toucher la DB
+- Utiliser `src/lib/sanitize.ts` (à créer dans chaque projet) avec `sanitizeText()`, `sanitizeEmail()`
+- Les formulaires de recherche sont des vecteurs d'injection — toujours valider côté serveur (jamais faire confiance au client)
+- Supabase ORM (`.eq()`, `.insert()`) protège contre l'injection SQL par défaut — mais XSS et logique métier restent à valider manuellement
+- Aucun HTML brut d'un utilisateur ne doit être rendu avec `dangerouslySetInnerHTML` sans sanitisation
+
+### 3. Authentification — utiliser Supabase Auth, jamais le faire soi-même
+
+- Utiliser Supabase Auth pour TOUT ce qui touche à l'identité (jamais un système maison)
+- Dans les Server Actions : toujours `supabase.auth.getUser()` (vérifie le JWT côté serveur)
+- Jamais `supabase.auth.getSession()` dans une Server Action (côté client uniquement, pas fiable)
+- `createAdminClient()` (service role) : uniquement pour des opérations admin légitimes (créer des comptes, modifier des rôles)
+- Toute route qui modifie des données doit vérifier l'authentification avant d'agir
+- Vérifier IDOR : l'utilisateur ne peut modifier que SES données (`WHERE id = auth.uid()`)
+
+### 4. Rate limiting — limiter toutes les requêtes sensibles
+
+- Endpoints à rate-limiter : login, inscription, reset password, envoi de formulaire, upload
+- Implémentation minimale : Map en mémoire avec compteur + timestamp de reset
+- Limites recommandées : 5 tentatives / 15 min pour auth, 3 / 10 min pour OTP/reset
+- Limite en mémoire (Map) : acceptable pour petits projets, non-persistante entre workers Vercel
+- Pour projets à fort trafic : utiliser Upstash Redis avec `@upstash/ratelimit`
+- Sur Vercel : activer "Speed Insights" + "DDoS Protection" dans les settings du projet
+
+### Checklist avant chaque déploiement production
+
+- [ ] `grep -r "SERVICE_ROLE\|RESEND_API" src --include="*.tsx"` → 0 résultat dans les fichiers client
+- [ ] Tous les Server Actions ont `getUser()` avant toute mutation
+- [ ] Les champs utilisateur ont `.trim()` + longueur max
+- [ ] Rate limiting en place sur login, inscription, reset
+- [ ] `.env.local` dans `.gitignore` ✅
+- [ ] Variables Vercel : uniquement les clés nécessaires, pas de secrets inutiles
+
+---
+
 ## Maintenance quotidienne — Règle permanente
 
 Claude doit effectuer une maintenance proactive quotidienne de ce projet. À chaque session de maintenance :
