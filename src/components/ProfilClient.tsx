@@ -158,7 +158,13 @@ export default function ProfilClient({ profile, member, userId }: Props) {
           <ArrowLeft size={16} /> Retour aux membres
         </Link>
 
-        <h1 className="text-2xl font-black text-gray-900 mb-6">Mon Profil</h1>
+        <h1 className="text-2xl font-black text-gray-900 mb-1">
+          {member ? `${member.prenom} ${member.nom}` : 'Mon Profil'}
+        </h1>
+        {member?.filiere && (
+          <p className="text-sm text-gray-500 mb-5">{member.filiere}{member.niveau ? ` — ${member.niveau}` : ''}</p>
+        )}
+        {!member?.filiere && <div className="mb-6" />}
 
         {/* Avatar */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-5 shadow-sm">
@@ -196,13 +202,14 @@ export default function ProfilClient({ profile, member, userId }: Props) {
 
             <div>
               <p className="font-bold text-gray-900 text-lg">
-                {member ? `${member.prenom} ${member.nom}` : 'Profil'}
+                {member ? `${member.prenom} ${member.nom}` : '—'}
               </p>
               {profile?.role && (
                 <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${
+                  profile.role === 'president' ? 'bg-yellow-100 text-yellow-700' :
                   profile.role === 'admin' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
                 }`}>
-                  {profile.role === 'admin' ? 'Bureau' : 'Membre'}
+                  {profile.role === 'president' ? '👑 Président' : profile.role === 'admin' ? '⭐ Bureau' : '👤 Membre'}
                 </span>
               )}
               {member?.filiere && (

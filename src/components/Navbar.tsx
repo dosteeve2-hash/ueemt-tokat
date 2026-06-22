@@ -138,7 +138,7 @@ export default function Navbar() {
 
   const dashboardHref = (profile?.role === 'admin' || profile?.role === 'president') ? '/dashboard/admin' : '/dashboard'
   const displayName = profile?.member
-    ? `${profile.member.prenom.split(' ')[0]} ${profile.member.nom}`
+    ? `${profile.member.prenom} ${profile.member.nom}`
     : user?.email?.split('@')[0] ?? ''
 
   const isActive = (href: string) =>
@@ -219,7 +219,7 @@ export default function Navbar() {
                         {displayName.slice(0, 2).toUpperCase()}
                       </div>
                     )}
-                    <span className="max-w-24 truncate">{displayName}</span>
+                    <span className="max-w-36 truncate">{displayName}</span>
                   </Link>
                   <Link href={dashboardHref} className="flex items-center gap-1.5 text-gray-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-400 font-semibold text-sm transition-colors px-2 py-1 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800" title="Mon espace">
                     <LayoutDashboard size={15} />
