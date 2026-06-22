@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Bell, Check, Heart, MessageCircle, Megaphone, UserPlus, Wallet } from 'lucide-react'
-import { markAsRead, markAllAsRead } from '@/app/notifications/actions'
+import { Bell, Check, Heart, MessageCircle, Megaphone, UserPlus, Wallet, X, Trash2 } from 'lucide-react'
+import { markAsRead, markAllAsRead, dismissNotification, dismissAllNotifications } from '@/app/notifications/actions'
 import type { NotificationData } from '@/app/notifications/actions'
 
 function timeAgo(dateStr: string): string {
@@ -78,6 +78,17 @@ export default function NotificationsClient({ notifications: initialNotifs }: Pr
     startTransition(async () => { await markAllAsRead() })
   }
 
+  const handleDismiss = (e: React.MouseEvent, notifId: string) => {
+    e.stopPropagation()
+    setNotifs(prev => prev.filter(n => n.id !== notifId))
+    startTransition(async () => { await dismissNotification(notifId) })
+  }
+
+  const handleDismissAll = () => {
+    setNotifs([])
+    startTransition(async () => { await dismissAllNotifications() })
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
       <header className="bg-green-600 text-white py-12">
@@ -88,14 +99,23 @@ export default function NotificationsClient({ notifications: initialNotifs }: Pr
       </header>
 
       <div className="max-w-2xl mx-auto px-4 py-6">
-        {notifs.length > 0 && unreadCount > 0 && (
-          <div className="flex justify-end mb-4">
+        {notifs.length > 0 && (
+          <div className="flex items-center justify-between mb-4">
+            {unreadCount > 0 ? (
+              <button
+                onClick={handleMarkAll}
+                className="flex items-center gap-1.5 text-sm text-green-600 hover:text-green-700 font-medium transition-colors"
+              >
+                <Check size={15} />
+                Tout marquer comme lu
+              </button>
+            ) : <span />}
             <button
-              onClick={handleMarkAll}
-              className="flex items-center gap-1.5 text-sm text-green-600 hover:text-green-700 font-medium transition-colors"
+              onClick={handleDismissAll}
+              className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-red-500 font-medium transition-colors"
             >
-              <Check size={15} />
-              Tout marquer comme lu
+              <Trash2 size={15} />
+              Tout effacer
             </button>
           </div>
         )}
@@ -139,9 +159,19 @@ export default function NotificationsClient({ notifications: initialNotifs }: Pr
                     </p>
                   </div>
 
-                  {!notif.read && (
-                    <span className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0" aria-label="Non lu" />
-                  )}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {!notif.read && (
+                      <span className="w-2.5 h-2.5 rounded-full bg-green-500" aria-label="Non lu" />
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => handleDismiss(e, notif.id)}
+                      className="p-1 rounded-full text-gray-300 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                      aria-label="Supprimer cette notification"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
                 </button>
               )
             })}

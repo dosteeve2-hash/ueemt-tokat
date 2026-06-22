@@ -69,3 +69,56 @@ export async function refuserMembre(memberId: string): Promise<{ error: string |
     return { error: 'Une erreur est survenue.' }
   }
 }
+
+// ─── Actions réservées au Président ──────────────────────────────────────────
+
+async function requirePresident() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/connexion')
+
+  const { data } = await supabase
+    .from('user_profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (data?.role !== 'president') redirect('/dashboard')
+  return { supabase, userId: user.id }
+}
+
+export async function supprimerMembreValide(memberId: string): Promise<{ error: string | null }> {
+  try {
+    const { supabase } = await requirePresident()
+
+    // Supprimer le membre (CASCADE supprime user_profiles via FK si configuré, sinon on nettoie manuellement)
+    await supabase.from('user_profiles').update({ member_id: null }).eq('member_id', memberId)
+    const { error } = await supabase.from('members').delete().eq('id', memberId)
+
+    if (error) return { error: 'Impossible de supprimer ce membre.' }
+    return { error: null }
+  } catch (e) {
+    console.error('[admin:supprimerMembreValide]', e)
+    return { error: 'Une erreur est survenue.' }
+  }
+}
+
+export async function changerRoleUser(
+  memberProfileId: string,
+  newRole: 'admin' | 'member',
+): Promise<{ error: string | null }> {
+  try {
+    const { supabase } = await requirePresident()
+
+    const { error } = await supabase
+      .from('user_profiles')
+      .update({ role: newRole })
+      .eq('id', memberProfileId)
+
+    if (error) return { error: 'Impossible de changer le rôle.' }
+    return { error: null }
+  } catch (e) {
+    console.error('[admin:changerRoleUser]', e)
+    return { error: 'Une erreur est survenue.' }
+  }
+}

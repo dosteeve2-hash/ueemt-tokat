@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { uploadPhoto } from '@/lib/supabase/storage'
-import { approuverMembre, refuserMembre } from '@/app/dashboard/admin/actions'
+import { approuverMembre, refuserMembre, supprimerMembreValide, changerRoleUser } from '@/app/dashboard/admin/actions'
 import { toast } from '@/lib/toast'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { useModal } from '@/hooks/useModal'
@@ -85,6 +85,14 @@ export default function AdminDashboardClient({
   const [, startApprovalTransition] = useTransition()
   const refuseModal = useModal()
   const [memberToReject, setMemberToReject] = useState<Member | null>(null)
+  const deleteValidatedModal = useModal()
+  const [memberToDelete, setMemberToDelete] = useState<Member | null>(null)
+  const [deletingValidatedId, setDeletingValidatedId] = useState<string | null>(null)
+  const [changingRoleId, setChangingRoleId] = useState<string | null>(null)
+  // Map: memberId → user_profiles.id (pour changer le rôle)
+  const [memberProfileIds, setMemberProfileIds] = useState<Record<string, string>>({})
+  const [memberRoles, setMemberRoles] = useState<Record<string, string>>({})
+  const isPresident = profile.role === 'president'
 
   // Album creation
   const [showAlbumForm, setShowAlbumForm] = useState(false)
@@ -202,6 +210,55 @@ export default function AdminDashboardClient({
   const toggleCotisation = async (id: string, current: boolean) => {
     await supabase.from('members').update({ cotisation_payee: !current }).eq('id', id)
     setMembers((m) => m.map((x) => (x.id === id ? { ...x, cotisation_payee: !current } : x)))
+  }
+
+  // ── Président : supprimer un membre validé ─────────────────────
+  const openDeleteValidatedModal = (member: Member) => {
+    setMemberToDelete(member)
+    deleteValidatedModal.open()
+  }
+
+  const handleSupprimerValide = async () => {
+    if (!memberToDelete) return
+    const id = memberToDelete.id
+    deleteValidatedModal.close()
+    setMemberToDelete(null)
+    setDeletingValidatedId(id)
+    const { error } = await supprimerMembreValide(id)
+    if (error) {
+      toast.error('Erreur', error)
+    } else {
+      setMembers((m) => m.filter((x) => x.id !== id))
+      toast.info('Membre supprimé de l\'association')
+    }
+    setDeletingValidatedId(null)
+  }
+
+  // ── Président : changer le rôle d'un utilisateur ──────────────
+  const handleChangerRole = async (member: Member, currentRole: string) => {
+    // Cherche le profile_id de cet utilisateur
+    let profileId = memberProfileIds[member.id]
+    if (!profileId) {
+      const { data } = await supabase
+        .from('user_profiles')
+        .select('id, role')
+        .eq('member_id', member.id)
+        .maybeSingle()
+      if (!data) { toast.error('Profil introuvable', 'Ce membre n\'a pas encore créé son compte.'); return }
+      profileId = data.id
+      setMemberProfileIds(prev => ({ ...prev, [member.id]: profileId }))
+      setMemberRoles(prev => ({ ...prev, [member.id]: data.role ?? 'member' }))
+    }
+    const newRole = (memberRoles[member.id] ?? currentRole) === 'admin' ? 'member' : 'admin'
+    setChangingRoleId(member.id)
+    const { error } = await changerRoleUser(profileId, newRole as 'admin' | 'member')
+    if (error) {
+      toast.error('Erreur', error)
+    } else {
+      setMemberRoles(prev => ({ ...prev, [member.id]: newRole }))
+      toast.success('Rôle mis à jour', `${member.prenom} est maintenant ${newRole === 'admin' ? 'membre du bureau' : 'membre standard'}.`)
+    }
+    setChangingRoleId(null)
   }
 
   // ── Albums CRUD ───────────────────────────────────────────────
@@ -537,6 +594,26 @@ export default function AdminDashboardClient({
                           >
                             Cotis.
                           </button>
+                          {isPresident && (
+                            <>
+                              <button
+                                onClick={() => handleChangerRole(m, 'member')}
+                                disabled={changingRoleId === m.id}
+                                title="Changer le rôle (bureau ↔ membre)"
+                                className="text-xs px-2 py-1.5 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 font-medium min-h-[36px] disabled:opacity-50 transition-colors"
+                              >
+                                {changingRoleId === m.id ? '...' : (memberRoles[m.id] === 'admin' ? '⭐ Bureau' : '👤 Rôle')}
+                              </button>
+                              <button
+                                onClick={() => openDeleteValidatedModal(m)}
+                                disabled={deletingValidatedId === m.id}
+                                title="Retirer de l'association"
+                                className="text-xs px-2 py-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 font-medium min-h-[36px] disabled:opacity-50 transition-colors"
+                              >
+                                {deletingValidatedId === m.id ? '...' : <Trash2 size={13} />}
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -935,6 +1012,17 @@ export default function AdminDashboardClient({
         confirmLabel="Refuser"
         confirmVariant="danger"
         isLoading={!!rejectingId}
+      />
+
+      <ConfirmModal
+        isOpen={deleteValidatedModal.isOpen}
+        onClose={deleteValidatedModal.close}
+        onConfirm={handleSupprimerValide}
+        title={memberToDelete ? `Retirer ${memberToDelete.prenom} ${memberToDelete.nom} ?` : 'Retirer ce membre ?'}
+        description="⚠️ Action réservée au Président. Ce membre sera définitivement retiré de l'association. Son compte de connexion sera conservé mais dissocié."
+        confirmLabel="Retirer de l'association"
+        confirmVariant="danger"
+        isLoading={!!deletingValidatedId}
       />
     </div>
   )

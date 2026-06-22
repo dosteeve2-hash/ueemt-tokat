@@ -112,6 +112,29 @@ export async function markAsRead(notifId: string): Promise<void> {
     .eq('user_id', user.id)
 }
 
+export async function dismissNotification(notifId: string): Promise<void> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  await supabase
+    .from('notifications')
+    .delete()
+    .eq('id', notifId)
+    .eq('user_id', user.id)
+}
+
+export async function dismissAllNotifications(): Promise<void> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  await supabase
+    .from('notifications')
+    .delete()
+    .eq('user_id', user.id)
+}
+
 export async function markAllAsRead(): Promise<void> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
