@@ -14,7 +14,7 @@ async function requireAdmin() {
     .select('role')
     .eq('id', user.id)
     .single()
-  if (profile?.role !== 'admin') throw new Error('Non autorisé')
+  if (profile?.role !== 'admin' && profile?.role !== 'president') throw new Error('Non autorisé')
   return { supabase, user }
 }
 
@@ -78,6 +78,59 @@ export async function createActivity(formData: FormData) {
   })
   if (error) throw new Error(error.message)
   revalidatePath('/activites')
+}
+
+export async function deleteAlbum(albumId: string): Promise<{ error: string | null }> {
+  try {
+    const { supabase } = await requireAdmin()
+    if (!albumId) return { error: 'Album introuvable.' }
+
+    // Supprimer les photos Storage en premier
+    const { data: photos } = await supabase
+      .from('photos')
+      .select('url')
+      .eq('album_id', albumId)
+
+    if (photos && photos.length > 0) {
+      const paths = photos
+        .map((p: { url: string }) => {
+          try {
+            const url = new URL(p.url)
+            const parts = url.pathname.split('/storage/v1/object/public/photos/')
+            return parts[1] ?? null
+          } catch { return null }
+        })
+        .filter(Boolean) as string[]
+      if (paths.length > 0) {
+        await supabase.storage.from('photos').remove(paths)
+      }
+    }
+
+    const { error } = await supabase.from('albums').delete().eq('id', albumId)
+    if (error) return { error: 'Impossible de supprimer cet album.' }
+
+    revalidatePath('/activites')
+    revalidatePath('/dashboard')
+    return { error: null }
+  } catch (e) {
+    console.error('[deleteAlbum]', e)
+    return { error: 'Une erreur est survenue.' }
+  }
+}
+
+export async function deleteActivity(activityId: string): Promise<{ error: string | null }> {
+  try {
+    const { supabase } = await requireAdmin()
+    if (!activityId) return { error: 'Activité introuvable.' }
+    const { error } = await supabase.from('activities').delete().eq('id', activityId)
+    if (error) return { error: 'Impossible de supprimer cette activité.' }
+    revalidatePath('/activites')
+    revalidatePath('/dashboard')
+    return { error: null }
+  } catch (e) {
+    console.error('[deleteActivity]', e)
+    return { error: 'Une erreur est survenue.' }
+  }
 }
 
 export async function createEvent(formData: FormData) {

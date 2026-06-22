@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['@react-pdf/renderer'],
   compress: true,
   poweredByHeader: false,
+  experimental: {
+    viewTransition: true,
+  },
   turbopack: {
     root: __dirname,
   },

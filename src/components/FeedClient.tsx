@@ -762,9 +762,15 @@ export default function FeedClient({ posts: initialPosts, currentUserId, current
             .from('photos')
             .upload(path, fileToUpload, { contentType: fileToUpload.type, upsert: false })
           setUploadProgress(null)
-          if (!uploadErr) {
-            imageUrl = supabase.storage.from('photos').getPublicUrl(path).data.publicUrl
+          if (uploadErr) {
+            setPosts(prev => prev.filter(p => p.id !== optimisticPost.id))
+            const msg = uploadErr.message?.toLowerCase().includes('payload') || uploadErr.message?.toLowerCase().includes('size')
+              ? 'Vidéo trop lourde (max 50 Mo). Compresse-la avant de l\'envoyer.'
+              : 'Impossible d\'envoyer la vidéo. Réessaie dans un instant.'
+            toast.error('Upload échoué', msg)
+            return
           }
+          imageUrl = supabase.storage.from('photos').getPublicUrl(path).data.publicUrl
         } else if (fileToUpload && mode === 'document') {
           const supabase = createClient()
           const safeName = fileToUpload.name.replace(/[^a-zA-Z0-9._-]/g, '_')

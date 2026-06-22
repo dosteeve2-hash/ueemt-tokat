@@ -8,6 +8,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { uploadPhoto } from '@/lib/supabase/storage'
 import { approuverMembre, refuserMembre, supprimerMembreValide, changerRoleUser } from '@/app/dashboard/admin/actions'
+import { deleteAlbum as deleteAlbumAction, deleteActivity as deleteActivityAction } from '@/app/activites/actions'
 import { toast } from '@/lib/toast'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { useModal } from '@/hooks/useModal'
@@ -298,15 +299,16 @@ export default function AdminDashboardClient({
   }
 
   const deleteAlbum = async (albumId: string) => {
-    const photos = albumPhotos[albumId] ?? []
-    for (const p of photos) {
-      const path = extractStoragePath(p.url)
-      if (path) await supabase.storage.from('photos').remove([path])
+    const result = await deleteAlbumAction(albumId)
+    if (result.error) {
+      toast.error('Erreur', result.error)
+      setDeletingAlbumId(null)
+      return
     }
-    await supabase.from('albums').delete().eq('id', albumId)
     setAlbums((prev) => prev.filter((a) => a.id !== albumId))
     setDeletingAlbumId(null)
     if (expandedAlbumId === albumId) setExpandedAlbumId(null)
+    toast.success('Album supprimé')
   }
 
   // ── Photos management ─────────────────────────────────────────
