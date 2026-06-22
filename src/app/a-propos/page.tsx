@@ -4,6 +4,39 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { BUREAU_MEMBERS } from '@/lib/constants'
 
+// ─── Composant photo avec fallback emoji ─────────────────────────────────────
+function PresidentPhoto({
+  src,
+  nom,
+  size = 'md',
+  borderColor = 'border-slate-600',
+}: {
+  src?: string | null
+  nom: string
+  size?: 'md' | 'lg'
+  borderColor?: string
+}) {
+  const [failed, setFailed] = useState(false)
+  const sizeClass = size === 'lg' ? 'w-28 h-28 sm:w-36 sm:h-36' : 'w-20 h-20'
+  const textSize = size === 'lg' ? 'text-5xl' : 'text-3xl'
+
+  if (!src || failed) {
+    return (
+      <div className={`${sizeClass} mx-auto mb-4 rounded-full bg-slate-700 border-2 ${borderColor} flex items-center justify-center ${textSize}`}>
+        👤
+      </div>
+    )
+  }
+  return (
+    <img
+      src={src}
+      alt={nom}
+      className={`${sizeClass} mx-auto mb-4 rounded-full object-cover object-top border-2 ${borderColor}`}
+      onError={() => setFailed(true)}
+    />
+  )
+}
+
 // ─── Timeline historique enrichie depuis les documents officiels ─────────────
 const TIMELINE = [
   {
@@ -77,6 +110,59 @@ const VALUES = [
     emoji: '🌍',
     title: 'Culture',
     desc: 'À des milliers de kilomètres du Mali, nous gardons vivantes nos traditions, notre musique, notre gastronomie. Notre identité est notre plus grande force.',
+  },
+]
+
+// ─── Présidents (ordre chronologique) ───────────────────────────────────────
+const PRESIDENTS = [
+  {
+    nom: 'Zakaria BENGALY',
+    prenom: 'Zakaria',
+    titre: 'Membre Fondateur & 1er Président',
+    mandat: 'Nov. 2022 – Déc. 2023',
+    statut: 'fondateur' as const,
+    photo: '/presidents/zakaria-bengaly.jpeg',
+    description: 'Il a convoqué en octobre 2022 le premier rassemblement des étudiants maliens de Tokat. Élu à l\'unanimité premier président le 29 octobre 2022, il fonde officiellement l\'AEMTO le 2 novembre 2022 — l\'acte de naissance de ce qui deviendrait l\'UEEMT-Tokat.',
+    citation: 'L\'UEEMT-Tokat, c\'est d\'abord son rêve.',
+    facts: [
+      '1er rassemblement organisé · Oct. 2022',
+      'Élu à l\'unanimité · 29 oct. 2022',
+      'Fondation officielle · 2 nov. 2022',
+      'Devise "Travail – Solidarité – Réussite"',
+    ],
+  },
+  {
+    nom: 'Mansa',
+    prenom: 'Mansa',
+    titre: '2ème Président',
+    mandat: 'Jan. 2024 – 2024',
+    statut: 'ancien' as const,
+    photo: null,
+    description: 'Il a consolidé les fondations de l\'union et renforcé la cohésion entre les membres.',
+    citation: null,
+    facts: [],
+  },
+  {
+    nom: 'Idriss Ali',
+    prenom: 'Idriss Ali',
+    titre: '3ème Président',
+    mandat: '2024 – 2025',
+    statut: 'ancien' as const,
+    photo: null,
+    description: 'Sous sa direction, l\'UEEMT a continué de grandir et de se structurer.',
+    citation: null,
+    facts: [],
+  },
+  {
+    nom: 'Fazkway',
+    prenom: 'Fazkway',
+    titre: '4ème Président',
+    mandat: '2025 – présent',
+    statut: 'actuel' as const,
+    photo: null,
+    description: 'Président en exercice, il guide l\'union avec détermination et vision.',
+    citation: null,
+    facts: [],
   },
 ]
 
@@ -271,6 +357,153 @@ export default function AProposPage() {
               </button>
             </div>
           )}
+        </div>
+      </section>
+
+      {/* ─── Stèle des Présidents ─────────────────────────────────────── */}
+      <section className="bg-slate-900 py-16 px-4">
+        <div className="max-w-5xl mx-auto">
+
+          {/* En-tête */}
+          <div className="text-center mb-12">
+            <span className="text-green-400 font-semibold text-xs uppercase tracking-widest">Mémoire & Honneur</span>
+            <h2 className="text-3xl font-black text-white mt-2">🏛️ Nos Présidents</h2>
+            <p className="text-slate-400 mt-2 text-sm">
+              Ceux qui ont porté le flambeau de l'UEEMT-Tokat
+            </p>
+            <div className="mt-4 flex justify-center gap-1">
+              <div className="h-1 w-8 bg-green-500 rounded" />
+              <div className="h-1 w-8 bg-yellow-400 rounded" />
+              <div className="h-1 w-8 bg-red-500 rounded" />
+            </div>
+          </div>
+
+          {/* ── Grand hommage au Fondateur ── */}
+          {(() => {
+            const fondateur = PRESIDENTS[0]
+            return (
+              <div className="relative mb-10">
+                {/* Badge fondateur flottant */}
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
+                  <span className="bg-yellow-400 text-slate-900 text-xs font-black px-4 py-1.5 rounded-full shadow-lg shadow-yellow-400/30 tracking-wide">
+                    ⭐ PRÉSIDENT FONDATEUR
+                  </span>
+                </div>
+
+                <div className="bg-gradient-to-br from-slate-800 to-slate-800/80 border border-yellow-400/40 rounded-3xl p-8 sm:p-10 shadow-2xl shadow-yellow-400/5">
+                  <div className="flex flex-col sm:flex-row items-center sm:items-start gap-8">
+
+                    {/* Photo + infos centrées */}
+                    <div className="flex-shrink-0 text-center">
+                      <PresidentPhoto
+                        src={fondateur.photo}
+                        nom={fondateur.nom}
+                        size="lg"
+                        borderColor="border-yellow-400"
+                      />
+                      <div className="inline-block bg-yellow-400/10 border border-yellow-400/30 rounded-xl px-3 py-1 mt-1">
+                        <span className="text-yellow-400 text-xs font-mono font-semibold">{fondateur.mandat}</span>
+                      </div>
+                    </div>
+
+                    {/* Texte hommage */}
+                    <div className="flex-1 text-center sm:text-left">
+                      <h3 className="text-white font-black text-2xl sm:text-3xl mb-1 leading-tight">
+                        {fondateur.nom}
+                      </h3>
+                      <p className="text-yellow-400 text-sm font-semibold mb-5">{fondateur.titre}</p>
+
+                      <p className="text-slate-300 text-base leading-relaxed mb-5">
+                        {fondateur.description}
+                      </p>
+
+                      {fondateur.citation && (
+                        <blockquote className="border-l-2 border-yellow-400 pl-4 mb-5">
+                          <p className="text-yellow-400/80 italic text-sm font-medium">{fondateur.citation}</p>
+                        </blockquote>
+                      )}
+
+                      {fondateur.facts.length > 0 && (
+                        <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
+                          {fondateur.facts.map((fact, fi) => (
+                            <span
+                              key={fi}
+                              className="bg-slate-700/80 border border-slate-600 text-slate-300 text-xs px-3 py-1.5 rounded-full"
+                            >
+                              {fact}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="mt-5 text-xs text-slate-500 italic">
+                        Membre du Conseil des Sages · Conseiller du bureau actuel
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* ── Les successeurs ── */}
+          <div className="mb-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="flex-1 h-px bg-slate-700" />
+              <span className="text-slate-500 text-xs uppercase tracking-widest font-semibold">Ses successeurs</span>
+              <div className="flex-1 h-px bg-slate-700" />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+              {PRESIDENTS.slice(1).map((president, i) => (
+                <div
+                  key={i}
+                  className={`relative bg-slate-800 border rounded-2xl p-6 text-center transition-all hover:scale-[1.02] ${
+                    president.statut === 'actuel'
+                      ? 'border-green-500/50 shadow-lg shadow-green-500/10'
+                      : 'border-slate-700'
+                  }`}
+                >
+                  {president.statut === 'actuel' && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                      <span className="bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5 whitespace-nowrap">
+                        <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse inline-block" />
+                        EN POSTE
+                      </span>
+                    </div>
+                  )}
+
+                  <PresidentPhoto
+                    src={president.photo}
+                    nom={president.nom}
+                    size="md"
+                    borderColor={president.statut === 'actuel' ? 'border-green-500/50' : 'border-slate-600'}
+                  />
+
+                  <div className="text-xs text-slate-500 mb-1 font-mono">{president.mandat}</div>
+                  <h3 className="text-white font-bold text-lg mb-0.5">{president.nom}</h3>
+                  <p className="text-yellow-400/70 text-xs mb-3">{president.titre}</p>
+                  <p className="text-slate-400 text-sm leading-relaxed">{president.description}</p>
+
+                  {president.statut !== 'actuel' && (
+                    <div className="mt-4 text-xs text-slate-600 italic">Conseil des Sages</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Devise */}
+          <div className="mt-8 bg-slate-800/40 border border-slate-700 rounded-2xl p-6 text-center">
+            <p className="text-slate-400 italic text-sm">
+              "Travail – Solidarité – Réussite"
+            </p>
+            <p className="text-slate-500 text-xs mt-2">
+              Depuis 2022, quatre présidents ont guidé l'UEEMT-Tokat avec dévouement.
+              Les présidents sortants forment le Conseil des Sages de notre union.
+            </p>
+          </div>
+
         </div>
       </section>
 

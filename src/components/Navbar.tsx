@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { Menu, X, LayoutDashboard, LogOut, Rss, User, Sun, Moon, Search, Coins, CalendarDays, Bell, Home, Users, ChevronRight, ShoppingBag } from 'lucide-react'
+import { Menu, X, LayoutDashboard, LogOut, Rss, User, Sun, Moon, Search, Coins, CalendarDays, Bell, Home, Users, ChevronRight, ShoppingBag, Scale } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { createClient } from '@/lib/supabase/client'
@@ -132,11 +132,15 @@ export default function Navbar() {
     { href: '/marketplace', label: 'Marketplace', icon: ShoppingBag },
     { href: '/cotisations', label: t('nav.cotisations'), icon: Coins },
     { href: '/activites', label: t('nav.activities'), icon: ChevronRight },
+    { href: '/archives', label: 'Archives', icon: ChevronRight },
     { href: '/notifications', label: 'Notifications', icon: Bell },
     { href: '/profil', label: t('nav.profile'), icon: User },
   ]
 
   const dashboardHref = (profile?.role === 'admin' || profile?.role === 'president') ? '/dashboard/admin' : '/dashboard'
+  const canSeeGouvernance = profile?.role != null && [
+    'admin', 'president', 'tresorier', 'adjoint_tresorier', 'secretaire', 'caissier', 'conseil_sages',
+  ].includes(profile.role)
   const displayName = profile?.member
     ? `${profile.member.prenom} ${profile.member.nom}`
     : user?.email?.split('@')[0] ?? ''
@@ -192,9 +196,17 @@ export default function Navbar() {
 
               {user && (
                 <>
+                  <Link href="/archives" className={`text-sm font-medium transition-colors ${isActive('/archives') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-400'}`}>
+                    Archives
+                  </Link>
                   <Link href="/cotisations" className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${isActive('/cotisations') ? 'text-green-600' : 'text-gray-700 dark:text-slate-300 hover:text-green-600'}`}>
                     <Coins size={14} />{t('nav.cotisations')}
                   </Link>
+                  {canSeeGouvernance && (
+                    <Link href="/gouvernance" className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${isActive('/gouvernance') ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-slate-300 hover:text-green-600 dark:hover:text-green-400'}`}>
+                      <Scale size={14} />Gouvernance
+                    </Link>
+                  )}
                 </>
               )}
 
@@ -334,6 +346,21 @@ export default function Navbar() {
             >
               <LayoutDashboard size={18} className="flex-shrink-0" />
               Mon espace
+            </Link>
+          )}
+
+          {user && canSeeGouvernance && (
+            <Link
+              href="/gouvernance"
+              onClick={() => setSidebarOpen(false)}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
+                isActive('/gouvernance')
+                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                  : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-green-600'
+              }`}
+            >
+              <Scale size={18} className="flex-shrink-0" />
+              Gouvernance
             </Link>
           )}
         </nav>

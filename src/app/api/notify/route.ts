@@ -27,19 +27,30 @@ export async function POST(request: Request) {
     }
   }
 
-  const body = await request.json() as { title?: string; message?: string; url?: string }
+  const body = await request.json() as {
+    title?: string
+    message?: string
+    body?: string
+    url?: string
+    exclude_user_id?: string
+  }
   const title = body.title ?? 'UEEMT-Tokat'
-  const message = body.message ?? 'Nouveau message dans le fil d\'actu'
+  const message = body.body ?? body.message ?? "Nouveau message dans le fil d'actu"
   const url = body.url ?? '/feed'
+  const excludeUserId = body.exclude_user_id ?? null
 
   const supabase = await createClient()
 
-  // Need service role to read all subscriptions (not just own)
-  const { data: subscriptions } = await supabase
+  // Fetch subscriptions with user_id to support exclude_user_id filtering
+  const { data: allSubs } = await supabase
     .from('push_subscriptions')
-    .select('endpoint, p256dh, auth')
+    .select('endpoint, p256dh, auth, user_id')
 
-  if (!subscriptions?.length) return Response.json({ sent: 0 })
+  const subscriptions = excludeUserId
+    ? (allSubs ?? []).filter((s) => s.user_id !== excludeUserId)
+    : (allSubs ?? [])
+
+  if (!subscriptions.length) return Response.json({ sent: 0 })
 
   const payload = JSON.stringify({ title, body: message, url })
 
