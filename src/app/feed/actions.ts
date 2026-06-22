@@ -52,15 +52,41 @@ export async function createPost(
     }
   }
 
-  // Fire-and-forget push notification
+  // Fetch author first name for the push notification
+  let auteurNom = 'Un membre'
+  try {
+    const { data: prof } = await supabase
+      .from('user_profiles')
+      .select('member_id')
+      .eq('id', user.id)
+      .single()
+    if (prof?.member_id) {
+      const { data: mem } = await supabase
+        .from('members')
+        .select('prenom')
+        .eq('id', prof.member_id)
+        .single()
+      if (mem?.prenom) auteurNom = mem.prenom
+    }
+  } catch {}
+
+  // Fire-and-forget push notification — exclude the poster, use real author name + content preview
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://ueemt-tokat.vercel.app'
+  const cronSecret = process.env.CRON_SECRET
+  const contentPreview = trimmedContent
+    ? trimmedContent.slice(0, 100) + (trimmedContent.length > 100 ? '…' : '')
+    : '(photo ou document)'
   fetch(`${siteUrl}/api/notify`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(cronSecret ? { 'Authorization': `Bearer ${cronSecret}` } : {}),
+    },
     body: JSON.stringify({
-      title: 'UEEMT-Tokat',
-      message: 'Nouveau post dans le fil d\'actu',
+      title: `📢 ${auteurNom} a publié`,
+      body: contentPreview,
       url: '/feed',
+      exclude_user_id: user.id,
     }),
   }).catch(() => {})
 }

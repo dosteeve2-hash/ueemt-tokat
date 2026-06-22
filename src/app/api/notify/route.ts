@@ -17,19 +17,40 @@ export async function POST(request: Request) {
     return Response.json({ error: 'VAPID non configuré' }, { status: 500 })
   }
 
-  const body = await request.json() as { title?: string; message?: string; url?: string }
+  // Internal endpoint — require CRON_SECRET to prevent unauthorized push spam
+  // Called from Server Actions via internal fetch with Authorization header
+  const cronSecret = process.env.CRON_SECRET
+  if (cronSecret) {
+    const authHeader = request.headers.get('authorization')
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return Response.json({ error: 'Non autorisé' }, { status: 401 })
+    }
+  }
+
+  const body = await request.json() as {
+    title?: string
+    message?: string
+    body?: string
+    url?: string
+    exclude_user_id?: string
+  }
   const title = body.title ?? 'UEEMT-Tokat'
-  const message = body.message ?? 'Nouveau message dans le fil d\'actu'
+  const message = body.body ?? body.message ?? "Nouveau message dans le fil d'actu"
   const url = body.url ?? '/feed'
+  const excludeUserId = body.exclude_user_id ?? null
 
   const supabase = await createClient()
 
-  // Need service role to read all subscriptions (not just own)
-  const { data: subscriptions } = await supabase
+  // Fetch subscriptions with user_id to support exclude_user_id filtering
+  const { data: allSubs } = await supabase
     .from('push_subscriptions')
-    .select('endpoint, p256dh, auth')
+    .select('endpoint, p256dh, auth, user_id')
 
-  if (!subscriptions?.length) return Response.json({ sent: 0 })
+  const subscriptions = excludeUserId
+    ? (allSubs ?? []).filter((s) => s.user_id !== excludeUserId)
+    : (allSubs ?? [])
+
+  if (!subscriptions.length) return Response.json({ sent: 0 })
 
   const payload = JSON.stringify({ title, body: message, url })
 

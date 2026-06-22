@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import ArchivesRecensementClient from './ArchivesRecensementClient'
+import ArchivesUploadForm from './ArchivesUploadForm'
 
 type ArchiveDoc = {
   id: string
@@ -36,13 +37,15 @@ function formatDate(d: string) {
   return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+const ROLES_BUREAU = ['admin', 'president', 'tresorier', 'adjoint_tresorier', 'secretaire', 'caissier']
+
 export default async function ArchivesPage() {
   const supabase = await createClient()
 
-  const [
-    { data: docs },
-    { data: membres },
-  ] = await Promise.all([
+  // Auth check — silently, no redirect (page is public)
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const [{ data: docs }, { data: membres }] = await Promise.all([
     supabase
       .from('archive_documents')
       .select('id, title, subtitle, description, content_summary, category, date_document, file_url, emoji')
@@ -53,6 +56,16 @@ export default async function ArchivesPage() {
       .select('id, nom_complet, filiere, annee_arrivee, ville_origine, date_recensement, member_id')
       .order('date_recensement', { ascending: true }),
   ])
+
+  let isBureau = false
+  if (user) {
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    isBureau = profile != null && ROLES_BUREAU.includes(profile.role)
+  }
 
   const archives = (docs ?? []) as ArchiveDoc[]
   const membresRecenses = (membres ?? []) as ArchiveMembre[]
@@ -82,6 +95,13 @@ export default async function ArchivesPage() {
           <span>🌍 Basée à <strong>Tokat, Türkiye</strong></span>
         </div>
       </div>
+
+      {/* ── Formulaire bureau (upload document) ── */}
+      {isBureau && (
+        <section className="max-w-4xl mx-auto px-4 pt-8">
+          <ArchivesUploadForm />
+        </section>
+      )}
 
       {/* ── Section Recensement ── */}
       <section className="max-w-4xl mx-auto px-4 pt-12">
