@@ -137,7 +137,7 @@ export default function MembresClient({ membres, isAdmin, currentUserId }: Props
                   <Link
                     key={m.id}
                     href={`/membres/${m.id}`}
-                    className="group bg-white rounded-2xl border border-gray-100 p-5 text-center hover:shadow-md hover:border-green-200 transition-all"
+                    className="group bg-white rounded-2xl border border-gray-100 p-5 text-center hover:shadow-lg hover:border-green-200 hover:-translate-y-1 transition-all duration-200"
                   >
                     <div className="mx-auto mb-3 w-16 h-16">
                       {m.avatarUrl ? (

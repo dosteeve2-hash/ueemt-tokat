@@ -316,6 +316,97 @@ function ShareButton({ postId }: { postId: string }) {
   )
 }
 
+// ─── Types réaction ──────────────────────────────────────────────────────────
+type ReactionType = 'love' | 'like' | 'celebrate'
+
+const REACTIONS: { type: ReactionType; emoji: string; label: string }[] = [
+  { type: 'love',      emoji: '❤️', label: 'J\'aime' },
+  { type: 'like',      emoji: '👍', label: 'Pouce' },
+  { type: 'celebrate', emoji: '🎉', label: 'Félicitations' },
+]
+
+function ReactionBar({ liked, likeCount, onLike }: { liked: boolean; likeCount: number; onLike: () => void }) {
+  // La réaction sélectionnée est locale (cosmétique) — le "like" DB ne change pas
+  const [selected, setSelected] = useState<ReactionType | null>(liked ? 'love' : null)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [popping, setPopping] = useState(false)
+  const count = likeCount
+
+  const triggerPop = () => {
+    setPopping(true)
+    setTimeout(() => setPopping(false), 350)
+  }
+
+  const handleMainClick = () => {
+    if (selected) {
+      setSelected(null)
+    } else {
+      setSelected('love')
+      triggerPop()
+    }
+    onLike()
+    setPickerOpen(false)
+  }
+
+  const handleReaction = (r: ReactionType) => {
+    if (selected === r) {
+      setSelected(null)
+      onLike() // toggle off
+    } else {
+      if (!selected) onLike() // only call once if switching
+      setSelected(r)
+      triggerPop()
+    }
+    setPickerOpen(false)
+  }
+
+  const currentEmoji = selected ? REACTIONS.find(r => r.type === selected)?.emoji : null
+
+  return (
+    <div className="relative flex items-center gap-1">
+      {/* Bouton principal réaction */}
+      <button
+        onClick={handleMainClick}
+        onMouseEnter={() => setPickerOpen(true)}
+        onMouseLeave={() => setTimeout(() => setPickerOpen(false), 300)}
+        className={`flex items-center gap-1.5 text-sm transition-all select-none ${
+          selected ? 'text-red-500 scale-110' : 'text-gray-400 hover:text-red-400'
+        } ${popping ? 'animate-reaction-pop' : ''}`}
+        aria-label="Réagir"
+      >
+        {currentEmoji ? (
+          <span className="text-base leading-none">{currentEmoji}</span>
+        ) : (
+          <Heart size={16} fill={selected ? 'currentColor' : 'none'} />
+        )}
+        {count > 0 && <span className="text-xs font-medium">{count}</span>}
+      </button>
+
+      {/* Picker d'emojis au survol */}
+      {pickerOpen && (
+        <div
+          className="absolute bottom-full left-0 mb-2 flex items-center gap-1 bg-white dark:bg-slate-800 rounded-full shadow-lg border border-gray-100 dark:border-slate-700 px-2 py-1 z-10"
+          onMouseEnter={() => setPickerOpen(true)}
+          onMouseLeave={() => setPickerOpen(false)}
+        >
+          {REACTIONS.map((r) => (
+            <button
+              key={r.type}
+              onClick={() => handleReaction(r.type)}
+              title={r.label}
+              className={`text-xl p-1 rounded-full transition-transform hover:scale-125 ${
+                selected === r.type ? 'scale-125' : ''
+              }`}
+            >
+              {r.emoji}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function PostCard({
   post,
   liked,
@@ -479,13 +570,7 @@ function PostCard({
         )}
 
         <div className="mt-3 flex items-center gap-4">
-          <button
-            onClick={onLike}
-            className={`flex items-center gap-1.5 text-sm transition-colors ${liked ? 'text-red-500' : 'text-gray-400 hover:text-red-400'}`}
-          >
-            <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
-            <span className="text-xs font-medium">{likeCount > 0 ? likeCount : ''}</span>
-          </button>
+          <ReactionBar liked={liked} likeCount={likeCount} onLike={onLike} />
           <ShareButton postId={post.id} />
         </div>
 

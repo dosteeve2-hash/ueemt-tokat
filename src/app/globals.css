@@ -46,6 +46,22 @@ body {
   animation: 220ms ease-out vt-fade-in;
 }
 
+/* ─── Réaction emoji — pop bounce ───────────────────────────── */
+@keyframes reaction-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.45); }
+  70%  { transform: scale(0.9); }
+  100% { transform: scale(1.1); }
+}
+.animate-reaction-pop {
+  animation: reaction-pop 350ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* ─── Carte membre — lift au survol ─────────────────────────── */
+@keyframes card-lift {
+  to { transform: translateY(-3px); }
+}
+
 /* ─── Ticker (caisse, annonces) ─────────────────────────────── */
 @keyframes marquee {
   0%   { transform: translateX(0); }
