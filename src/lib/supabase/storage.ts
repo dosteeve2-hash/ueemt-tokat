@@ -50,3 +50,22 @@ export async function deletePhotoFromStorage(url: string): Promise<boolean> {
   const { error } = await supabase.storage.from('photos').remove([path])
   return !error
 }
+
+/**
+ * Upload la photo d'un fondateur dans le bucket "avatars" sous fondateurs/<name>.<ext>
+ * Retourne l'URL publique ou null en cas d'erreur.
+ */
+export async function uploadFounderPhoto(
+  founderKey: string,
+  file: File
+): Promise<string | null> {
+  const supabase = createClient()
+  const ext = file.name.split('.').pop() ?? 'jpg'
+  const path = `fondateurs/${founderKey}.${ext}`
+  const { error } = await supabase.storage
+    .from('avatars')
+    .upload(path, file, { upsert: true, contentType: file.type })
+  if (error) return null
+  const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+  return data.publicUrl
+}

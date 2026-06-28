@@ -8,6 +8,17 @@ export type CaisseInfo = {
   cotisation_mensuelle: number
 }
 
+export type CaisseHistoriqueItem = {
+  id: string
+  type: 'entree' | 'sortie' | 'update'
+  montant: number
+  prenom: string | null
+  nom: string | null
+  month: string | null
+  notes: string | null
+  created_at: string
+}
+
 export type MaCotisation = {
   paid: boolean
   amount: number | null
@@ -181,6 +192,17 @@ export async function marquerPaye(memberId: string, amount: number, notes?: stri
 
   const targetMonth = month ?? currentMonthDate()
 
+  // Vérifier si un paiement existant existe (pour calculer le delta caisse)
+  const { data: existingPayment } = await supabase
+    .from('cotisation_payments')
+    .select('amount')
+    .eq('member_id', memberId)
+    .eq('month', targetMonth)
+    .maybeSingle()
+
+  const previousAmount = existingPayment ? Number(existingPayment.amount) : 0
+  const delta = amount - previousAmount
+
   const { error } = await supabase
     .from('cotisation_payments')
     .upsert({
@@ -196,6 +218,39 @@ export async function marquerPaye(memberId: string, amount: number, notes?: stri
     console.error('[marquerPaye]', error.code)
     throw new Error('Impossible d\'enregistrer le paiement.')
   }
+
+  // ── Mettre à jour la caisse automatiquement ──────────────────────────────
+  if (delta !== 0) {
+    const { data: caisseData } = await supabase
+      .from('caisse')
+      .select('montant')
+      .eq('id', 1)
+      .single()
+
+    const currentMontant = caisseData ? Number(caisseData.montant) : 0
+    const newMontant = Math.max(0, currentMontant + delta)
+
+    await supabase
+      .from('caisse')
+      .update({
+        montant: newMontant,
+        updated_at: new Date().toISOString(),
+        updated_by: user.id,
+      })
+      .eq('id', 1)
+
+    // Enregistrer dans l'historique (best-effort : la table peut ne pas encore exister)
+    try {
+      await supabase.from('caisse_historique').insert({
+        type: existingPayment ? 'update' : 'entree',
+        montant: delta,
+        member_id: memberId,
+        month: targetMonth,
+        notes: notes ?? null,
+        enregistre_par: user.id,
+      })
+    } catch { /* table non encore créée */ }
+  }
 }
 
 export async function annulerPaiement(memberId: string, month?: string) {
@@ -208,6 +263,14 @@ export async function annulerPaiement(memberId: string, month?: string) {
 
   const targetMonth = month ?? currentMonthDate()
 
+  // Récupérer le montant avant suppression pour mettre à jour la caisse
+  const { data: payment } = await supabase
+    .from('cotisation_payments')
+    .select('amount')
+    .eq('member_id', memberId)
+    .eq('month', targetMonth)
+    .maybeSingle()
+
   const { error } = await supabase
     .from('cotisation_payments')
     .delete()
@@ -217,6 +280,40 @@ export async function annulerPaiement(memberId: string, month?: string) {
   if (error) {
     console.error('[annulerPaiement]', error.code)
     throw new Error('Impossible d\'annuler le paiement.')
+  }
+
+  // ── Déduire le montant de la caisse automatiquement ──────────────────────
+  if (payment) {
+    const amount = Number(payment.amount)
+    const { data: caisseData } = await supabase
+      .from('caisse')
+      .select('montant')
+      .eq('id', 1)
+      .single()
+
+    const currentMontant = caisseData ? Number(caisseData.montant) : 0
+    const newMontant = Math.max(0, currentMontant - amount)
+
+    await supabase
+      .from('caisse')
+      .update({
+        montant: newMontant,
+        updated_at: new Date().toISOString(),
+        updated_by: user.id,
+      })
+      .eq('id', 1)
+
+    // Enregistrer dans l'historique (best-effort)
+    try {
+      await supabase.from('caisse_historique').insert({
+        type: 'sortie',
+        montant: -amount,
+        member_id: memberId,
+        month: targetMonth,
+        notes: 'Annulation de paiement',
+        enregistre_par: user.id,
+      })
+    } catch { /* table non encore créée */ }
   }
 }
 
@@ -283,6 +380,54 @@ export async function mettreAJourMontants(cotisation_mensuelle: number, montant_
   if (error) {
     console.error('[mettreAJourMontants]', error.code)
     throw new Error('Impossible de mettre à jour les montants.')
+  }
+}
+
+export async function getCaisseHistorique(limit = 20): Promise<CaisseHistoriqueItem[]> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/connexion')
+
+  await requireTresorierOrAdmin(supabase, user.id)
+
+  try {
+    const { data, error } = await supabase
+      .from('caisse_historique')
+      .select(`
+        id,
+        type,
+        montant,
+        month,
+        notes,
+        created_at,
+        member:member_id (prenom, nom)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (error || !data) return []
+
+    return data.map((row: {
+      id: string
+      type: string
+      montant: number
+      month: string | null
+      notes: string | null
+      created_at: string
+      member: { prenom: string; nom: string } | null
+    }) => ({
+      id: row.id,
+      type: row.type as 'entree' | 'sortie' | 'update',
+      montant: Number(row.montant),
+      prenom: row.member?.prenom ?? null,
+      nom: row.member?.nom ?? null,
+      month: row.month,
+      notes: row.notes,
+      created_at: row.created_at,
+    }))
+  } catch {
+    // Table caisse_historique non encore créée
+    return []
   }
 }
 

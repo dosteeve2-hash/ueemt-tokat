@@ -15,15 +15,7 @@ if %errorlevel% neq 0 (
 echo.
 echo === git add + commit + push ===
 git add -A
-git commit -m "feat: PWA icon fix + UX v2 ameliorations
-
-- Route /api/pwa-icon : icone PWA dynamique depuis Supabase site_settings
-- manifest.json pointe vers /api/pwa-icon (toujours a jour si logo change)
-- layout.tsx : apple-touch-icon + meta icon vers /api/pwa-icon
-- FeedClient : reactions emoji 👍 ❤️ 🎉 avec picker au survol + animation pop
-- DashboardClient : avatar dans le header, completion profil avec barre %, onglet Activites utile
-- MembresClient : hover -translate-y-1 + shadow-lg
-- globals.css : keyframes animate-reaction-pop"
+git commit -m "feat: votre message de commit ici"
 
 git push origin main
 

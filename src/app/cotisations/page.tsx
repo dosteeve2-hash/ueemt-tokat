@@ -6,6 +6,7 @@ import {
   getMaCotisation,
   getMonHistorique,
   getAllCotisations,
+  getCaisseHistorique,
 } from './actions'
 
 export default async function CotisationsPage() {
@@ -22,11 +23,12 @@ export default async function CotisationsPage() {
   const role = profile?.role ?? 'member'
   const isGestionnaire = ['president', 'admin', 'tresorier', 'adjoint_tresorier', 'caissier'].includes(role)
 
-  const [caisseInfo, maCotisation, historique, allCotisations] = await Promise.all([
+  const [caisseInfo, maCotisation, historique, allCotisations, caisseHistorique] = await Promise.all([
     getCaisseInfo(),
     getMaCotisation(),
     getMonHistorique(),
     isGestionnaire ? getAllCotisations() : Promise.resolve([]),
+    isGestionnaire ? getCaisseHistorique() : Promise.resolve([]),
   ])
 
   return (
@@ -37,6 +39,7 @@ export default async function CotisationsPage() {
       historique={historique}
       allCotisations={allCotisations}
       isGestionnaire={isGestionnaire}
+      caisseHistorique={caisseHistorique}
     />
   )
 }
