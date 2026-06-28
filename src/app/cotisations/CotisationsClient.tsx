@@ -7,6 +7,7 @@ import type {
   MaCotisation,
   HistoriqueItem,
   CotisationRow,
+  CaisseHistoriqueItem,
 } from './actions'
 import {
   marquerPaye,
@@ -23,6 +24,7 @@ interface Props {
   historique: HistoriqueItem[]
   allCotisations: CotisationRow[]
   isGestionnaire: boolean
+  caisseHistorique?: CaisseHistoriqueItem[]
 }
 
 function formatMois(dateStr: string): string {
@@ -364,6 +366,54 @@ function TableauCotisations({
   )
 }
 
+// ─── Historique caisse ────────────────────────────────────────
+function HistoriqueCaisse({ items }: { items: CaisseHistoriqueItem[] }) {
+  if (items.length === 0) {
+    return (
+      <div className="py-6 text-center text-sm text-gray-400 dark:text-slate-500">
+        Aucune entrée encore — les paiements apparaîtront ici automatiquement.
+      </div>
+    )
+  }
+
+  const typeLabel: Record<string, { label: string; cls: string; sign: string }> = {
+    entree: { label: 'Entrée', cls: 'text-green-600 dark:text-green-400', sign: '+' },
+    sortie: { label: 'Sortie', cls: 'text-red-500 dark:text-red-400', sign: '-' },
+    update: { label: 'Ajust.', cls: 'text-blue-500 dark:text-blue-400', sign: '±' },
+  }
+
+  return (
+    <div className="divide-y divide-gray-50 dark:divide-slate-700">
+      {items.map(item => {
+        const t = typeLabel[item.type] ?? { label: item.type, cls: 'text-gray-500', sign: '' }
+        return (
+          <div key={item.id} className="flex items-center gap-3 px-4 py-3">
+            <div className={`flex-shrink-0 w-14 text-xs font-bold ${t.cls}`}>{t.label}</div>
+            <div className="flex-1 min-w-0">
+              {item.prenom && (
+                <p className="text-sm font-medium text-gray-900 dark:text-slate-100 truncate">
+                  {item.prenom} {item.nom}
+                </p>
+              )}
+              {item.notes && (
+                <p className="text-xs text-gray-400 dark:text-slate-500 truncate">{item.notes}</p>
+              )}
+              <p className="text-xs text-gray-400 dark:text-slate-500">
+                {new Date(item.created_at).toLocaleDateString('fr-FR', {
+                  day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                })}
+              </p>
+            </div>
+            <span className={`text-sm font-bold flex-shrink-0 ${t.cls}`}>
+              {t.sign}{formatTRY(Math.abs(item.montant))}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ─── Main Client ─────────────────────────────────────────────
 export default function CotisationsClient({
   role,
@@ -372,6 +422,7 @@ export default function CotisationsClient({
   historique,
   allCotisations,
   isGestionnaire,
+  caisseHistorique = [],
 }: Props) {
   const [caisse, setCaisse] = useState(caisseInfo)
 
@@ -507,6 +558,19 @@ export default function CotisationsClient({
               montantCaisse={caisse.montant}
               isAdmin={role === 'admin'}
             />
+          </div>
+        )}
+
+        {/* Historique automatique de la caisse */}
+        {isGestionnaire && (
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm p-5">
+            <h2 className="font-bold text-gray-900 dark:text-slate-100 mb-1 flex items-center gap-2">
+              <Wallet size={18} /> Historique de la caisse
+            </h2>
+            <p className="text-xs text-gray-400 dark:text-slate-500 mb-4">
+              Mis à jour automatiquement à chaque paiement ou annulation.
+            </p>
+            <HistoriqueCaisse items={caisseHistorique} />
           </div>
         )}
       </div>

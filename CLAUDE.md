@@ -29,9 +29,9 @@ Toutes les 4 cases doivent être cochées :
 
 Si une case manque → garder un prompt manuel simple.
 
-### Quand Steve donne un objectif
+### Quand Steeve donne un objectif
 
-Steve donne : l'objectif + les critères de réussite.
+Steeve donne : l'objectif + les critères de réussite.
 Claude fait : PLAN → FAIRE → VÉRIFIER → DÉCIDER en boucle, sans interruption, jusqu'à TERMINÉ.
 Claude pose des questions uniquement si une information bloquante manque — sinon il prend une hypothèse raisonnable et la signale.
 
@@ -521,7 +521,7 @@ Après chaque maintenance, produire un rapport structuré :
 
 ### Contraintes
 
-- Ne jamais modifier les variables d'environnement Supabase ou Vercel sans validation explicite de Steve
+- Ne jamais modifier les variables d'environnement Supabase ou Vercel sans validation explicite de Steeve
 - Ne jamais supprimer de données en production
 - Toujours faire un `npm run build` avant de pusher
 - Committer chaque correction séparément avec un message clair
@@ -680,4 +680,4 @@ ALTER TABLE feed_posts ADD COLUMN club_id uuid REFERENCES clubs(id);
 
 ---
 
-*Maintenu par Steve Donald Compaoré — dernière mise à jour : 2026-06-20*
+*Maintenu par Steeve Donald Compaoré — dernière mise à jour : 2026-06-28*

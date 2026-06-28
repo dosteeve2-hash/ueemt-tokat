@@ -1,6 +1,6 @@
 /**
  * Route dynamique pour servir l'icône PWA depuis le logo courant en Supabase.
- * Chaque fois que Steve change le logo dans site_settings, cette route reflète
+ * Chaque fois que Steeve change le logo dans site_settings, cette route reflète
  * automatiquement la mise à jour — même pour les icônes de l'écran d'accueil.
  *
  * Utilisée par manifest.json et les meta tags <link rel="icon">.

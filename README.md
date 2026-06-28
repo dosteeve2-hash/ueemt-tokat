@@ -164,7 +164,7 @@ Ce projet est open-source et les contributions sont bienvenues !
 
 ## 📄 Licence
 
-MIT © 2026 [Steve Donald Compaoré](https://github.com/dosteeve2-hash)
+MIT © 2026 [Steeve Donald Compaoré](https://github.com/dosteeve2-hash)
 
 ---
 

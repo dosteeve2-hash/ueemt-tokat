@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { Menu, X, LayoutDashboard, LogOut, Rss, User, Sun, Moon, Search, Coins, CalendarDays, Bell, Home, Users, ChevronRight, ShoppingBag, Scale } from 'lucide-react'
+import { Menu, X, LayoutDashboard, LogOut, Rss, User, Sun, Moon, Search, Coins, CalendarDays, Bell, Home, Users, ChevronRight, ShoppingBag, Scale, Trophy } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { createClient } from '@/lib/supabase/client'
@@ -119,6 +119,7 @@ export default function Navbar() {
   const publicLinks = [
     { href: '/', label: t('nav.home'), icon: Home },
     { href: '/a-propos', label: t('nav.about'), icon: ChevronRight },
+    { href: '/fondateurs', label: 'Fondateurs', icon: Trophy },
     { href: '/archives', label: 'Archives', icon: ChevronRight },
     { href: '/membres', label: t('nav.members'), icon: Users },
     { href: '/activites', label: t('nav.activities'), icon: ChevronRight },
@@ -131,6 +132,7 @@ export default function Navbar() {
     { href: '/evenements', label: 'Événements', icon: CalendarDays },
     { href: '/marketplace', label: 'Marketplace', icon: ShoppingBag },
     { href: '/cotisations', label: t('nav.cotisations'), icon: Coins },
+    { href: '/fondateurs', label: 'Fondateurs', icon: Trophy },
     { href: '/activites', label: t('nav.activities'), icon: ChevronRight },
     { href: '/archives', label: 'Archives', icon: ChevronRight },
     { href: '/notifications', label: 'Notifications', icon: Bell },
