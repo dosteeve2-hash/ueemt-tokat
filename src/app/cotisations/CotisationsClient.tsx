@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { CheckCircle2, Clock, Wallet, Users, ChevronDown, ChevronUp, Loader2, AlertCircle, Bell } from 'lucide-react'
+import { CheckCircle2, Clock, Wallet, Users, ChevronDown, ChevronUp, Loader2, AlertCircle, Bell, Download } from 'lucide-react'
 import type {
   CaisseInfo,
   MaCotisation,
@@ -23,6 +23,7 @@ interface Props {
   historique: HistoriqueItem[]
   allCotisations: CotisationRow[]
   isGestionnaire: boolean
+  chartSlot?: React.ReactNode
 }
 
 function formatMois(dateStr: string): string {
@@ -76,6 +77,26 @@ function TableauCotisations({
   const [savingConfig, setSavingConfig] = useState(false)
   const [sendingRappel, setSendingRappel] = useState(false)
   const [rappelResult, setRappelResult] = useState<string | null>(null)
+
+  const handleExportCSV = () => {
+    const header = 'Nom,Prénom,Montant dû (₺),Montant payé (₺),Solde (₺),Statut'
+    const csvRows = rows.map(r => {
+      const montantPaye = r.amount ?? 0
+      const solde = montantPaye - cotisationMensuelle
+      const statut = r.paid ? 'À jour' : 'En retard'
+      return [r.nom, r.prenom, cotisationMensuelle, montantPaye, solde, statut].join(',')
+    })
+    const csv = [header, ...csvRows].join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `cotisations-${new Date().toISOString().slice(0, 7)}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
 
   const reload = () => {
     startTransition(async () => {
@@ -173,8 +194,8 @@ function TableauCotisations({
         </div>
       </div>
 
-      {/* Envoyer rappel */}
-      <div className="flex items-center gap-3">
+      {/* Actions: rappel + export CSV */}
+      <div className="flex flex-wrap items-center gap-3">
         <button
           onClick={handleEnvoyerRappel}
           disabled={sendingRappel}
@@ -183,6 +204,15 @@ function TableauCotisations({
           {sendingRappel ? <Loader2 size={14} className="animate-spin" /> : <Bell size={14} />}
           Envoyer rappel cotisation
         </button>
+        {isAdmin && (
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 bg-[#0d1b2a] hover:bg-[#0d1b2a]/80 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+          >
+            <Download size={14} />
+            Exporter CSV
+          </button>
+        )}
         {rappelResult && (
           <span className="text-sm text-gray-600 dark:text-slate-300">{rappelResult}</span>
         )}
@@ -372,6 +402,7 @@ export default function CotisationsClient({
   historique,
   allCotisations,
   isGestionnaire,
+  chartSlot,
 }: Props) {
   const [caisse, setCaisse] = useState(caisseInfo)
 
@@ -494,6 +525,9 @@ export default function CotisationsClient({
             </p>
           </div>
         )}
+
+        {/* Graphique cotisations (gestionnaire) */}
+        {chartSlot}
 
         {/* Tableau gestionnaire */}
         {isGestionnaire && (
