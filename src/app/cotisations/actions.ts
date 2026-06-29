@@ -32,6 +32,12 @@ export type HistoriqueItem = {
   paid_at: string
 }
 
+export type ChartDataPoint = {
+  mois: string
+  paye: number
+  du: number
+}
+
 function currentMonthDate(): string {
   const now = new Date()
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
@@ -284,6 +290,46 @@ export async function mettreAJourMontants(cotisation_mensuelle: number, montant_
     console.error('[mettreAJourMontants]', error.code)
     throw new Error('Impossible de mettre à jour les montants.')
   }
+}
+
+export async function getChartData(): Promise<ChartDataPoint[]> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/connexion')
+
+  await requireTresorierOrAdmin(supabase, user.id)
+
+  const [caisseRes, membresRes] = await Promise.all([
+    supabase.from('caisse').select('cotisation_mensuelle').eq('id', 1).single(),
+    supabase.from('members').select('id', { count: 'exact', head: true }).eq('is_validated', true),
+  ])
+
+  const cotisationMensuelle = Number(caisseRes.data?.cotisation_mensuelle ?? 50)
+  const nbMembres = membresRes.count ?? 0
+
+  // Generate last 6 months (YYYY-MM-01)
+  const now = new Date()
+  const months: string[] = []
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`)
+  }
+
+  const { data: payments } = await supabase
+    .from('cotisation_payments')
+    .select('month, amount')
+    .in('month', months)
+
+  const payMap: Record<string, number> = {}
+  for (const p of (payments ?? [])) {
+    payMap[p.month] = (payMap[p.month] ?? 0) + Number(p.amount)
+  }
+
+  return months.map(m => ({
+    mois: new Date(m).toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' }),
+    paye: payMap[m] ?? 0,
+    du: nbMembres * cotisationMensuelle,
+  }))
 }
 
 export async function envoyerRappels(): Promise<{ sent: number }> {
