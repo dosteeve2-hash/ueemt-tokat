@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { Menu, X, LayoutDashboard, LogOut, Rss, User, Sun, Moon, Search, Coins, CalendarDays, Bell, Home, Users, ChevronRight, ShoppingBag, Scale } from 'lucide-react'
+import { Menu, X, LayoutDashboard, LogOut, Rss, User, Sun, Moon, Search, Coins, CalendarDays, Bell, Home, Users, ChevronRight, ShoppingBag, Scale, Megaphone } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { createClient } from '@/lib/supabase/client'
@@ -127,6 +127,7 @@ export default function Navbar() {
 
   const memberLinks = [
     { href: '/feed', label: t('nav.feed'), icon: Rss },
+    { href: '/annonces', label: 'Annonces', icon: Megaphone },
     { href: '/membres', label: t('nav.members'), icon: Users },
     { href: '/evenements', label: 'Événements', icon: CalendarDays },
     { href: '/marketplace', label: 'Marketplace', icon: ShoppingBag },
