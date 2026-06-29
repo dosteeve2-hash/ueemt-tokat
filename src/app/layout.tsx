@@ -8,6 +8,7 @@ import { ThemeProvider } from '@/components/ThemeProvider'
 import { LanguageProvider } from '@/contexts/LanguageContext'
 import PushNotificationSetup from '@/components/PushNotificationSetup'
 import { Toaster } from 'sonner'
+import ScrollToTopButton from '@/components/ScrollToTopButton'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -94,6 +95,7 @@ export default function RootLayout({
             <main className="pb-16 md:pb-0">{children}</main>
             <PushNotificationSetup />
             <Footer />
+            <ScrollToTopButton />
             <Toaster
               position="bottom-right"
               richColors
