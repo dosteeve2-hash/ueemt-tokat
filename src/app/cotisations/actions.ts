@@ -414,13 +414,13 @@ export async function getCaisseHistorique(limit = 20): Promise<CaisseHistoriqueI
       month: string | null
       notes: string | null
       created_at: string
-      member: { prenom: string; nom: string } | null
+      member: { prenom: string; nom: string }[] | null
     }) => ({
       id: row.id,
       type: row.type as 'entree' | 'sortie' | 'update',
       montant: Number(row.montant),
-      prenom: row.member?.prenom ?? null,
-      nom: row.member?.nom ?? null,
+      prenom: row.member?.[0]?.prenom ?? null,
+      nom: row.member?.[0]?.nom ?? null,
       month: row.month,
       notes: row.notes,
       created_at: row.created_at,
